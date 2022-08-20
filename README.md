@@ -1,2 +1,2 @@
-# NesSimulator
-A NES Simulator for fun!
+# NesEmulator
+A NES Emulator for fun!
