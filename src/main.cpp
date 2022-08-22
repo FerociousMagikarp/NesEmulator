@@ -1,5 +1,7 @@
 #include <iostream>
 #include <string.h>
+#include "cartridge.h"
+#include "emulator.h"
 
 namespace nes
 {
@@ -10,7 +12,7 @@ namespace nes
 
 	struct Options
 	{
-		char*        rom_path = nullptr;
+		const char*  rom_path = nullptr;
 		int          option_code = 0;
 		int          scale = 2;
 
@@ -65,7 +67,6 @@ namespace nes
 int main(int argc, char *argv[])
 {
 	nes::Options options;
-	std::cout << sizeof(options) << std::endl;
 	if (!options.ParseOptions(argc, argv))
 	{
 		std::cout << "Parse options error! Use -h or --help to get help." << std::endl;
@@ -81,6 +82,13 @@ int main(int argc, char *argv[])
 				  << std::endl;
 		return 0;
 	}
-	std::cout << options.rom_path << std::endl;
+	
+	nes::Cartridge cartridge;
+	if (!cartridge.LoadFromFile(options.rom_path))
+	{
+		std::cout << "Failed to load .nes from " << options.rom_path << std::endl;
+		return 0;
+	}
+
 	return 0;
 }
