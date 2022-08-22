@@ -90,5 +90,8 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
+	nes::Emulator emulator;
+	emulator.PutInCartridge(&cartridge);
+
 	return 0;
 }
