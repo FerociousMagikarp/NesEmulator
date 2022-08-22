@@ -8,8 +8,6 @@
 
 namespace nes
 {
-    using uint8 = unsigned char;
-
     struct NesFileHead
     {
         char identification[4];
@@ -75,7 +73,7 @@ namespace nes
         if ((m_special_flags & Trainer) != 0)
         {
             constexpr int trainer_size = 512;
-            m_trainer = std::make_unique<std::array<unsigned char, trainer_size>>();
+            m_trainer = std::make_unique<std::array<byte, trainer_size>>();
             // 这写法十分诡异
             if (!ifstream.read(reinterpret_cast<char*>(&m_trainer->at(0)), trainer_size))
             {
