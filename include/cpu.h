@@ -7,7 +7,7 @@ namespace nes
     class CPU6502
     {
     public:
-        CPU6502();
+        CPU6502() noexcept;
         ~CPU6502();
 
     private:

@@ -9,7 +9,7 @@ namespace nes
     class Emulator
     {
     public:
-        Emulator();
+        Emulator() noexcept;
         ~Emulator();
 
         void PutInCartridge(Cartridge* cartridge);

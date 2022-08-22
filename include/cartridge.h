@@ -11,7 +11,7 @@ namespace nes
     class Cartridge
     {
     public:
-        Cartridge();
+        Cartridge() noexcept;
         ~Cartridge();
 
         bool LoadFromFile(const char *path);

@@ -21,7 +21,7 @@ namespace nes
         uint8 unused[5];
     };
 
-    Cartridge::Cartridge()
+    Cartridge::Cartridge() noexcept
     {
 
     }
@@ -75,7 +75,7 @@ namespace nes
             constexpr int trainer_size = 512;
             m_trainer = std::make_unique<std::array<byte, trainer_size>>();
             // 这写法十分诡异
-            if (!ifstream.read(reinterpret_cast<char*>(&m_trainer->at(0)), trainer_size))
+            if (!ifstream.read(reinterpret_cast<char*>(&(*m_trainer)[0]), trainer_size))
             {
                 std::cout << "Read Trainer Failed." << std::endl;
                 goto analyze_error;

@@ -2,7 +2,7 @@
 
 namespace nes
 {
-    Emulator::Emulator()
+    Emulator::Emulator() noexcept
     {
 
     }
