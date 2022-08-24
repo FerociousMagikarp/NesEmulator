@@ -92,6 +92,7 @@ int main(int argc, char *argv[])
 
 	nes::Emulator emulator;
 	emulator.PutInCartridge(&cartridge);
+	emulator.Run();
 
 	return 0;
 }

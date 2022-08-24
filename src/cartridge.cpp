@@ -6,6 +6,8 @@
 #include <memory>
 #include <stdio.h>
 
+#include "mappers/all_mappers.h"
+
 namespace nes
 {
     struct NesFileHead
@@ -73,9 +75,8 @@ namespace nes
         if ((m_special_flags & Trainer) != 0)
         {
             constexpr int trainer_size = 512;
-            m_trainer = std::make_unique<std::array<byte, trainer_size>>();
-            // 这写法十分诡异
-            if (!ifstream.read(reinterpret_cast<char*>(&(*m_trainer)[0]), trainer_size))
+            m_trainer = std::make_unique<byte[]>(trainer_size);
+            if (!ifstream.read(reinterpret_cast<char*>(m_trainer.get()), trainer_size))
             {
                 std::cout << "Read Trainer Failed." << std::endl;
                 goto analyze_error;
@@ -88,7 +89,7 @@ namespace nes
             std::cout << "Read PRG ROM Failed." << std::endl;
             goto analyze_error;
         }
-        // 读取CHR_ROm
+        // 读取CHR_ROM
         if (file_head.CHR_ROM_size > 0)
         {
             m_CHR_Rom.resize(0x2000 * file_head.CHR_ROM_size);
@@ -98,13 +99,35 @@ namespace nes
                 goto analyze_error;
             }
         }
+        // 创建额外的RAM
+        if (m_special_flags & CartridgeContainsBatteryBacked)
+        {
+            constexpr int PRG_Ram_size = 0x2000;
+            m_PRG_ram = std::make_unique<byte[]>(PRG_Ram_size);
+        }
 
         // TODO : Play Choice
         
+        // 创建Mapper
+        CreateMapper();
+
         ifstream.close();
         return true;
     analyze_error:
         ifstream.close();
         return false;
+    }
+
+    void Cartridge::CreateMapper()
+    {
+        // 先这么写
+        switch (m_mapper_id)
+        {
+        case 0:
+            m_mapper = std::make_unique<Mapper0, Cartridge*>(this);
+            break;
+        default:
+            break;
+        }
     }
 }
