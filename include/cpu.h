@@ -34,7 +34,7 @@ namespace nes
         inline bool GetB() { return m_P & 0x10; }
         inline bool GetV() { return m_P & 0x40; }
         inline bool GetN() { return m_P & 0x80; }
-        inline void SetP(uint8 value, bool set)
+        inline void SetFlag(uint8 value, bool set)
         {
             if (set) m_SP |= value;
             else     m_SP &= ~value;

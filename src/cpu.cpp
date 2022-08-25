@@ -51,9 +51,9 @@ namespace nes
             m_PC++;
         PushStack(m_PC >> 8);
         PushStack(m_PC);
-        SetP(B, type == CPU6502InterruptType::BRK);
+        SetFlag(B, type == CPU6502InterruptType::BRK);
         PushStack(m_P);
-        SetP(I, true);
+        SetFlag(I, true);
         switch (type)
         {
         case CPU6502InterruptType::BRK:
