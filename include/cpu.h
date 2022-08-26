@@ -21,7 +21,7 @@ namespace nes
         void Interrupt(CPU6502InterruptType type);
         
         inline void PushStack(byte value) { m_write_function(0x100 | m_SP--, value); }
-        inline byte PopStack() { return m_read_function(0x100 | ++m_SP); }
+        inline byte PullStack() { return m_read_function(0x100 | ++m_SP); }
 
         // 设置从总线读写ram或者mapper的回调
         inline void SetReadFunction(std::function<byte(uint16)>&& callback) { m_read_function = std::move(callback); }
@@ -44,6 +44,65 @@ namespace nes
         uint16 ReadAddress(uint16 start_address);
         void InterruptExecute(CPU6502InterruptType type);
 
+        // 所有指令，返回值表示是否把结果存回去
+        bool ADC();
+        bool AND();
+        bool ASL();
+        bool BCC();
+        bool BCS();
+        bool BEQ();
+        bool BIT();
+        bool BMI();
+        bool BNE();
+        bool BPL();
+        bool BRK();
+        bool BVC();
+        bool BVS();
+        bool CLC();
+        bool CLD();
+        bool CLI();
+        bool CLV();
+        bool CMP();
+        bool CPX();
+        bool CPY();
+        bool DEC();
+        bool DEX();
+        bool DEY();
+        bool EOR();
+        bool INC();
+        bool INX();
+        bool INY();
+        bool JMP();
+        bool JSR();
+        bool LDA();
+        bool LDX();
+        bool LDY();
+        bool LSR();
+        bool NOP();
+        bool ORA();
+        bool PHA();
+        bool PHP();
+        bool PLA();
+        bool PLP();
+        bool ROL();
+        bool ROR();
+        bool RTI();
+        bool RTS();
+        bool SBC();
+        bool SEC();
+        bool SED();
+        bool SEI();
+        bool STA();
+        bool STX();
+        bool STY();
+        bool TAX();
+        bool TAY();
+        bool TSX();
+        bool TXA();
+        bool TXS();
+        bool TYA();
+
+
     private:
         // 程序计数器
         uint16 m_PC = 0;
@@ -60,6 +119,13 @@ namespace nes
 
         // 正好差一字节对齐，弄个中断记录
         uint8 m_current_interrupt = 0;
+
+        // 寻址寻出来的数放这了
+        uint16 m_src = 0;
+        // 需要跳过的周期数
+        uint16 m_skip_cycles = 0;
+        // 总的周期数
+        uint32 m_cycles = 0;
 
         std::function<byte(uint16)> m_read_function;
         std::function<void(uint16, byte)> m_write_function;
