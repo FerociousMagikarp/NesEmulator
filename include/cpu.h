@@ -17,6 +17,8 @@ namespace nes
 
         // 初始化
         void Reset();
+        // 单步执行
+        void Step();
         // 设置中断
         void Interrupt(CPU6502InterruptType type);
         
@@ -43,6 +45,22 @@ namespace nes
     private:
         uint16 ReadAddress(uint16 start_address);
         void InterruptExecute(CPU6502InterruptType type);
+        void ExecuteCode(uint8 op_code);
+
+        // 寻址方式，寻到的值放到src里，返回值是地址。
+        inline uint16 Implied() { return 0; }
+        uint16 Immediate();
+        uint16 Absolute();
+        uint16 ZeroPage();
+        uint16 Accumulator();
+        uint16 AbsoluteX();
+        uint16 AbsoluteY();
+        uint16 ZeroPageX();
+        uint16 ZeroPageY();
+        uint16 Indirect();
+        uint16 IndirectX();
+        uint16 IndirectY();
+        uint16 Relative();
 
         // 所有指令，返回值表示是否把结果存回去
         bool ADC();
@@ -102,6 +120,8 @@ namespace nes
         bool TXS();
         bool TYA();
 
+        // 扩展用的指令
+        inline bool XXX() { return false; }
 
     private:
         // 程序计数器

@@ -1,6 +1,8 @@
 #include "cpu.h"
+#include "cpu_instructions.h"
 #include "def.h"
 #include <iostream>
+#include <type_traits>
 
 namespace nes
 {
@@ -14,6 +16,31 @@ namespace nes
         V = (1 << 6),
         N = (1 << 7)
     };
+
+    struct InstructionInfo
+    {
+        char                  instruction_name[4];
+        CPU6502AddressingType addressing_type;
+        int                   cycles;
+    };
+
+    constexpr auto GetAllInstructionInfo()
+    {
+        std::array<InstructionInfo, 256> result{};
+
+        #define OPERATION(op_code_, instruction_, addressing_, cycles_, ...) \
+        { \
+            InstructionInfo info{#instruction_, CPU6502AddressingType::addressing_, cycles_}; \
+            result[op_code_] = info; \
+        } \
+
+        _CPU6502_ALL_INSTRUCTIONS_
+        #undef OPERATION
+
+        return result;
+    }
+
+    constexpr auto cpu_all_instruction_info = GetAllInstructionInfo();
 
     CPU6502::CPU6502() noexcept
     {
@@ -33,6 +60,38 @@ namespace nes
         m_PC = ReadAddress(RESET_ADDRESS);
     }
 
+    void CPU6502::Step()
+    {
+        if (m_skip_cycles > 0)
+        {
+            m_skip_cycles--;
+            return;
+        }
+        // 执行中断
+        if (m_current_interrupt != 0)
+        {
+            if (m_current_interrupt & (1 << static_cast<int>(CPU6502InterruptType::NMI)))
+            {
+                InterruptExecute(CPU6502InterruptType::NMI);
+                m_current_interrupt = 0;
+                m_skip_cycles--; // 本周期已经执行过了，所以-1
+                return;
+            }
+            else if (m_current_interrupt & (1 << static_cast<int>(CPU6502InterruptType::IRQ)))
+            {
+                InterruptExecute(CPU6502InterruptType::IRQ);
+                m_current_interrupt = 0;
+                m_skip_cycles--; // 本周期已经执行过了，所以-1
+                return;
+            }
+        }
+        // 读取指令
+        byte op_code = m_read_function(m_PC++);
+        // std::cout << m_PC-1 << " : " << (int)op_code << "  " << cpu_all_instruction_info[op_code].instruction_name << std::endl;
+        ExecuteCode(op_code);
+        m_skip_cycles--; // 本周期已经执行过了，所以-1
+    }
+
     void CPU6502::Interrupt(CPU6502InterruptType type)
     {
         m_current_interrupt |= (1 << static_cast<int>(type));
@@ -40,7 +99,7 @@ namespace nes
 
     uint16 CPU6502::ReadAddress(uint16 start_address)
     {
-        return m_read_function(start_address) | (static_cast<uint16>(start_address + 1) << 8);
+        return m_read_function(start_address) | (static_cast<uint16>(m_read_function(start_address + 1)) << 8);
     }
 
     void CPU6502::InterruptExecute(CPU6502InterruptType type)
@@ -64,7 +123,159 @@ namespace nes
             m_PC = ReadAddress(NMI_VECTOR);
             break;
         }
+        m_skip_cycles += 7;
     }
+
+    void CPU6502::ExecuteCode(uint8 op_code)
+    {
+        // 为可能使用到的地址
+        uint16 address;
+
+        #define OPERATION(op_code_, instruction_, addressing_, cycles_, ...) \
+        case op_code_: \
+            if constexpr (CPU6502AddressingType::addressing_ == CPU6502AddressingType::XXX) \
+            { \
+                std::cout << "Unrecognized OP Code : " << op_code_ << std::endl; \
+            } \
+            else if constexpr (CPU6502AddressingType::addressing_ == CPU6502AddressingType::Implied || \
+                               CPU6502AddressingType::addressing_ == CPU6502AddressingType::Immediate || \
+                               CPU6502AddressingType::addressing_ == CPU6502AddressingType::Accumulator || \
+                               CPU6502AddressingType::addressing_ == CPU6502AddressingType::Indirect || \
+                               CPU6502AddressingType::addressing_ == CPU6502AddressingType::Relative) \
+            { \
+                this->addressing_(); \
+                this->instruction_(); \
+                this->m_skip_cycles += cycles_; \
+            } \
+            else \
+            { \
+                address = this->addressing_(); \
+                if (this->instruction_()) /*结果为true说明需要写回地址*/ \
+                    this->m_write_function(address, this->m_src); \
+                this->m_skip_cycles += cycles_; \
+                /*只有在这种情况下才会出现跨页加指令周期*/ \
+                if constexpr(0##__VA_ARGS__) \
+                { \
+                    if ((this->m_PC & 0xff00) != (address & 0xff00))\
+                        this->m_skip_cycles++; \
+                } \
+            } \
+            break; \
+
+        switch (op_code)
+        {
+            _CPU6502_ALL_INSTRUCTIONS_
+        }
+
+        #undef OPERATION
+    }
+
+    // =========================================
+    // 寻址模式
+    // =========================================
+
+    // 立即寻址
+    uint16 CPU6502::Immediate()
+    {
+        m_src = m_read_function(m_PC++);
+        return 0;
+    }
+
+    uint16 CPU6502::Absolute()
+    {
+        uint16 address = m_read_function(m_PC++);
+        address |= static_cast<uint16>(m_PC++) << 8;
+        m_src = m_read_function(address);
+        return address;
+    }
+
+    uint16 CPU6502::ZeroPage()
+    {
+        uint16 address = m_read_function(m_PC++);
+        m_src = m_read_function(address);
+        return address;
+    }
+
+    uint16 CPU6502::Accumulator()
+    {
+        m_src = m_A;
+        return 0;
+    }
+
+    uint16 CPU6502::AbsoluteX()
+    {
+        uint16 address = m_read_function(m_PC++);
+        address |= static_cast<uint16>(m_PC++) << 8;
+        address += m_X;
+        m_src = m_read_function(address);
+        return address;
+    }
+
+    uint16 CPU6502::AbsoluteY()
+    {
+        uint16 address = m_read_function(m_PC++);
+        address |= static_cast<uint16>(m_PC++) << 8;
+        address += m_Y;
+        m_src = m_read_function(address);
+        return address;
+    }
+
+    uint16 CPU6502::ZeroPageX()
+    {
+        uint16 address = m_read_function(m_PC++);
+        address += m_X;
+        m_src = m_read_function(address);
+        return address;
+    }
+
+    uint16 CPU6502::ZeroPageY()
+    {
+        uint16 address = m_read_function(m_PC++);
+        address += m_Y;
+        m_src = m_read_function(address);
+        return address;
+    }
+
+    uint16 CPU6502::Indirect()
+    {
+        // 这个仅用于JMP，而且还有bug
+        uint16 address_tmp = m_read_function(m_PC++);
+        address_tmp |= static_cast<uint16>(m_read_function(m_PC++)) << 8;
+        uint16 addresss_first = (address_tmp & 0xff00) | ((address_tmp + 1) & 0x00ff);
+        uint16 address = m_read_function(address_tmp);
+        address |= static_cast<uint16>(m_read_function(addresss_first)) << 8;
+        m_src = address;
+        return address;
+    }
+
+    uint16 CPU6502::IndirectX()
+    {
+        byte op = m_read_function(m_PC++);
+        uint16 address_first = m_read_function(op + m_X);
+        uint16 address = m_read_function(address_first);
+        address |= static_cast<uint16>(m_read_function(address_first + 1)) << 8;
+        m_src = m_read_function(address);
+        return address;
+    }
+
+    uint16 CPU6502::IndirectY()
+    {
+        uint16 address = m_read_function(m_PC++);
+        address |= static_cast<uint16>(m_read_function(m_PC++)) << 8;
+        address += m_Y;
+        m_src = m_read_function(address);
+        return address;
+    }
+
+    uint16 CPU6502::Relative()
+    {
+        m_src = m_read_function(m_PC++);
+        return 0;
+    }
+
+    // =========================================
+    // 指令
+    // =========================================
 
     bool CPU6502::ADC()
     {

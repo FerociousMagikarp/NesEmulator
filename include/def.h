@@ -14,4 +14,22 @@ namespace nes
         BRK,
         NMI
     };
+
+    enum class CPU6502AddressingType
+    {
+        Implied,
+        Immediate,
+        Accumulator,
+        Absolute,
+        AbsoluteX,
+        AbsoluteY,
+        ZeroPage,
+        ZeroPageX,
+        ZeroPageY,
+        Indirect,
+        IndirectX,
+        IndirectY,
+        Relative,
+        XXX = -1
+    };
 }
