@@ -19,9 +19,9 @@ namespace nes
         inline const std::vector<byte>& GetPRGRom() { return m_PRG_Rom; }
         inline const std::vector<byte>& GetCHRRom() { return m_CHR_Rom; }
         inline const std::unique_ptr<Mapper>& GetMapper() { return m_mapper; }
-        inline byte ReadPRGRam(uint16 address) 
+        inline byte ReadPRGRam(uint16 address)
         {
-            if(m_PRG_ram) return m_PRG_ram[address];
+            if(m_PRG_ram)  return m_PRG_ram[address];
             else           return 0;
         }
         inline void WritePRGRam(uint16 address, byte value)

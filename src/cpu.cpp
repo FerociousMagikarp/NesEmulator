@@ -270,6 +270,7 @@ namespace nes
     uint16 CPU6502::Relative()
     {
         m_src = m_read_function(m_PC++);
+        m_src = m_PC + static_cast<int8>(m_src);
         return 0;
     }
 
@@ -309,8 +310,8 @@ namespace nes
     {
         if (!GetC())
         {
-            m_skip_cycles += (m_PC & 0xff00) != ((m_PC + m_src) & 0xff00) ? 2 : 1;
-            m_PC += m_src;
+            m_skip_cycles += (m_PC & 0xff00) != (m_src & 0xff00) ? 2 : 1;
+            m_PC = m_src;
         }
         return false;
     }
@@ -318,9 +319,9 @@ namespace nes
     bool CPU6502::BCS()
     {
         if (GetC())
-        {
-            m_skip_cycles += (m_PC & 0xff00) != ((m_PC + m_src) & 0xff00) ? 2 : 1;
-            m_PC += m_src;
+        {     
+            m_skip_cycles += (m_PC & 0xff00) != (m_src & 0xff00) ? 2 : 1;
+            m_PC = m_src;
         }
         return false;
     }
@@ -329,8 +330,8 @@ namespace nes
     {
         if (GetZ())
         {
-            m_skip_cycles += (m_PC & 0xff00) != ((m_PC + m_src) & 0xff00) ? 2 : 1;
-            m_PC += m_src;
+            m_skip_cycles += (m_PC & 0xff00) != (m_src & 0xff00) ? 2 : 1;
+            m_PC = m_src;
         }
         return false;
     }
@@ -347,8 +348,8 @@ namespace nes
     {
         if (GetN())
         {
-            m_skip_cycles += (m_PC & 0xff00) != ((m_PC + m_src) & 0xff00) ? 2 : 1;
-            m_PC += m_src;
+            m_skip_cycles += (m_PC & 0xff00) != (m_src & 0xff00) ? 2 : 1;
+            m_PC = m_src;
         }
         return false;
     }
@@ -357,8 +358,8 @@ namespace nes
     {
         if (!GetZ())
         {
-            m_skip_cycles += (m_PC & 0xff00) != ((m_PC + m_src) & 0xff00) ? 2 : 1;
-            m_PC += m_src;
+            m_skip_cycles += (m_PC & 0xff00) != (m_src & 0xff00) ? 2 : 1;
+            m_PC = m_src;
         }
         return false;
     }
@@ -367,8 +368,8 @@ namespace nes
     {
         if (!GetN())
         {
-            m_skip_cycles += (m_PC & 0xff00) != ((m_PC + m_src) & 0xff00) ? 2 : 1;
-            m_PC += m_src;
+            m_skip_cycles += (m_PC & 0xff00) != (m_src & 0xff00) ? 2 : 1;
+            m_PC = m_src;
         }
         return false;
     }
@@ -383,8 +384,8 @@ namespace nes
     {
         if (!GetV())
         {
-            m_skip_cycles += (m_PC & 0xff00) != ((m_PC + m_src) & 0xff00) ? 2 : 1;
-            m_PC += m_src;
+            m_skip_cycles += (m_PC & 0xff00) != (m_src & 0xff00) ? 2 : 1;
+            m_PC = m_src;
         }
         return false;
     }
@@ -393,8 +394,8 @@ namespace nes
     {
         if (GetV())
         {
-            m_skip_cycles += (m_PC & 0xff00) != ((m_PC + m_src) & 0xff00) ? 2 : 1;
-            m_PC += m_src;
+            m_skip_cycles += (m_PC & 0xff00) != (m_src & 0xff00) ? 2 : 1;
+            m_PC = m_src;
         }
         return false;
     }
