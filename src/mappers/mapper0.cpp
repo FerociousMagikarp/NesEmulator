@@ -1,16 +1,29 @@
 #include "mappers/mapper0.h"
 #include "cartridge.h"
+#include <memory>
 
 namespace nes
 {
+    Mapper0::Mapper0(Cartridge* cartridge) : Mapper(cartridge)
+    {
+        if (cartridge->GetCHRRom().size() == 0)
+        {
+            m_CHR_ram = std::make_unique<byte[]>(0x2000);
+        }
+    }
+
     byte Mapper0::ReadCHR(uint16 address)
     {
-        return 0;
+        if (m_cartridge->GetCHRRom().size() == 0)
+            return m_CHR_ram[address];
+        else
+            return m_cartridge->GetCHRRom()[address];
     }
 
     void Mapper0::WriteCHR(uint16 address, byte value)
     {
-
+         if (m_cartridge->GetCHRRom().size() == 0)
+            m_CHR_ram[address] = value;
     }
 
     byte Mapper0::ReadPRG(uint16 address)
