@@ -2,6 +2,7 @@
 #include <string.h>
 #include "cartridge.h"
 #include "emulator.h"
+#include "sdl_application.h"
 
 namespace nes
 {
@@ -93,6 +94,9 @@ int main(int argc, char *argv[])
 	nes::Emulator emulator;
 	emulator.PutInCartridge(&cartridge);
 	emulator.Run();
+
+	SDLApplication application;
+	application.Run();
 
 	return 0;
 }
