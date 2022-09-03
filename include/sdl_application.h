@@ -1,5 +1,6 @@
 #pragma once
 
+#include "device.h"
 
 struct SDL_Window;
 struct SDL_Renderer;
@@ -11,7 +12,7 @@ public:
     SDLApplication();
     ~SDLApplication();
 
-    void Run();
+    void Run(nes::Device* device, bool& is_running);
 private:
     SDL_Window* m_window = nullptr;
     SDL_Renderer* m_renderer = nullptr;

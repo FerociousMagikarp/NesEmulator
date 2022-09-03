@@ -1,8 +1,10 @@
 #include <iostream>
 #include <string.h>
+#include <future>
 #include "cartridge.h"
 #include "emulator.h"
 #include "sdl_application.h"
+#include "device.h"
 
 namespace nes
 {
@@ -15,7 +17,7 @@ namespace nes
 	{
 		const char*  rom_path = nullptr;
 		int          option_code = 0;
-		int          scale = 2;
+		float        scale = 2.0f;
 
 		bool ParseOptions(int argc, char *argv[]);
 	};
@@ -33,7 +35,7 @@ namespace nes
 			{
 				if (++i < argc)
 				{
-					this->scale = std::stoi(argv[i]);
+					this->scale = std::stof(argv[i]);
 				}
 				else
 				{
@@ -91,12 +93,18 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
-	nes::Emulator emulator;
-	emulator.PutInCartridge(&cartridge);
-	emulator.Run();
+	nes::Device device;
+	bool is_running = true;
+
+	auto future = std::async(std::launch::async, [&device, &cartridge, &is_running]()
+	{
+		nes::Emulator emulator;
+		emulator.PutInCartridge(&cartridge);
+		emulator.Run(&device, is_running);
+	});
 
 	SDLApplication application;
-	application.Run();
+	application.Run(&device, is_running);
 
 	return 0;
 }

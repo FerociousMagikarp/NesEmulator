@@ -34,4 +34,7 @@ namespace nes
         Relative,
         XXX = -1
     };
+
+    constexpr int WIDTH = 256;
+    constexpr int HEIGHT = 240;
 }
