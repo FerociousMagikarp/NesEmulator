@@ -51,6 +51,7 @@ namespace nes
         inline uint16 Implied() { return 0; }
         uint16 Immediate();
         uint16 Absolute();
+        uint16 AbsoluteAd();
         uint16 ZeroPage();
         uint16 Accumulator();
         uint16 AbsoluteX();

@@ -151,7 +151,7 @@ namespace nes
             { \
                 address = this->addressing_(); \
                 if (this->instruction_()) /*结果为true说明需要写回地址*/ \
-                    this->m_write_function(address, this->m_src); \
+                    this->m_write_function(address, (this->m_src) & 0xff); \
                 this->m_skip_cycles += cycles_; \
                 /*只有在这种情况下才会出现跨页加指令周期*/ \
                 if constexpr(0##__VA_ARGS__) \
@@ -187,6 +187,14 @@ namespace nes
         address |= static_cast<uint16>(m_PC++) << 8;
         m_src = m_read_function(address);
         return address;
+    }
+
+    uint16 CPU6502::AbsoluteAd()
+    {
+        uint16 address = m_read_function(m_PC++);
+        address |= static_cast<uint16>(m_PC++) << 8;
+        m_src = ReadAddress(address);
+        return 0;
     }
 
     uint16 CPU6502::ZeroPage()

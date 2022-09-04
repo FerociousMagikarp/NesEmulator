@@ -23,6 +23,7 @@ namespace nes
         Immediate,
         Accumulator,
         Absolute,
+        AbsoluteAd,
         AbsoluteX,
         AbsoluteY,
         ZeroPage,

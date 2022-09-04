@@ -47,7 +47,7 @@ OPERATION(0x1c, XXX, XXX,         0) \
 OPERATION(0x1d, ORA, AbsoluteX,   4, 1) \
 OPERATION(0x1e, ASL, AbsoluteX,   7) \
 OPERATION(0x1f, XXX, XXX,         0) \
-OPERATION(0x20, JSR, Absolute,    6) \
+OPERATION(0x20, JSR, AbsoluteAd,  6) \
 OPERATION(0x21, AND, IndirectX,   6) \
 OPERATION(0x22, XXX, XXX,         0) \
 OPERATION(0x23, XXX, XXX,         0) \
@@ -91,7 +91,7 @@ OPERATION(0x48, PHA, Implied,     3) \
 OPERATION(0x49, EOR, Immediate,   2) \
 OPERATION(0x4a, LSR, Accumulator, 2) \
 OPERATION(0x4b, XXX, XXX,         0) \
-OPERATION(0x4c, JMP, Absolute,    3) \
+OPERATION(0x4c, JMP, AbsoluteAd,  3) \
 OPERATION(0x4d, EOR, Absolute,    0) \
 OPERATION(0x4e, LSR, Absolute,    6) \
 OPERATION(0x4f, XXX, XXX,         0) \
