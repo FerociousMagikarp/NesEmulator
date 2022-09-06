@@ -139,12 +139,18 @@ namespace nes
             } \
             else if constexpr (CPU6502AddressingType::addressing_ == CPU6502AddressingType::Implied || \
                                CPU6502AddressingType::addressing_ == CPU6502AddressingType::Immediate || \
-                               CPU6502AddressingType::addressing_ == CPU6502AddressingType::Accumulator || \
                                CPU6502AddressingType::addressing_ == CPU6502AddressingType::Indirect || \
                                CPU6502AddressingType::addressing_ == CPU6502AddressingType::Relative) \
             { \
                 this->addressing_(); \
                 this->instruction_(); \
+                this->m_skip_cycles += cycles_; \
+            } \
+            else if constexpr (CPU6502AddressingType::addressing_ == CPU6502AddressingType::Accumulator) \
+            { \
+                this->addressing_(); \
+                if (this->instruction_()) \
+                    m_A = m_src; \
                 this->m_skip_cycles += cycles_; \
             } \
             else \

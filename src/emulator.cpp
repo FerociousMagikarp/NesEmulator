@@ -10,12 +10,8 @@ namespace nes
     {
         m_CPU.SetReadFunction([this](uint16 address)->byte { return MainBusRead(address); });
         m_CPU.SetWriteFunction([this](uint16 address, byte value) { return MainBusWrite(address, value); });
-        m_PPU.SetReadFunction([this](uint16 address)->byte { return PPUBusRead(address); });
-        m_PPU.SetWriteFunction([this](uint16 address, byte value) { return PPUBusWrite(address, value); });
         // 分配2K内存
         m_RAM  = std::make_unique<byte[]>(0x0800);
-        // 分配2K显存
-        m_VRAM = std::make_unique<byte[]>(0x0800);
     }
 
     Emulator::~Emulator()
@@ -30,6 +26,8 @@ namespace nes
 
     void Emulator::Run(Device* device, bool& is_running)
     {
+        m_PPU.SetCartridge(m_cartridge);
+
         m_CPU.Reset();
         m_PPU.Reset();
         /*while (is_running)
@@ -91,57 +89,4 @@ namespace nes
         }
     }
 
-    byte Emulator::PPUBusRead(uint16 address)
-    {
-        switch (address >> 12)
-        {
-        case 0x00:  // 地址范围 : [0, 0x1000)
-            return m_cartridge->GetMapper()->ReadCHR(address); // 图样表0
-        case 0x01:  // 地址范围 : [0x1000, 0x2000)
-            return m_cartridge->GetMapper()->ReadCHR(address); // 图样表1
-        case 0x02:  // 地址范围 : [0x2000, 0x3000)
-            // 名称表0 ：[0x2000, 0x2400)
-            // 名称表1 ：[0x2400, 0x2800)
-            // 名称表2 ：[0x2800, 0x2C00)
-            // 名称表3 ：[0x2C00, 0x3000)
-            // 先按照名称表0,2对应显存0x0000, 1,3对应0x0400来写
-            return m_VRAM[((address >> 10) & 0x01) * 0x400 + (address & 0x3ff)];
-        case 0x03:  // 地址范围 : [0x3000, 0x4000)
-            if (address < 0x3eff) // [0x2000, 0x2eff)镜像
-                return PPUBusRead(address & 0x2fff);
-            else
-                return m_PPU.GetPalette(address & 0x1f);
-        default:
-            break;
-        }
-        return 0;
-    }
-
-    void Emulator::PPUBusWrite(uint16 address, byte value)
-    {
-        switch (address >> 12)
-        {
-        case 0x00:  // 地址范围 : [0, 0x1000)
-            m_cartridge->GetMapper()->WriteCHR(address, value); // 图样表0
-            break;
-        case 0x01:  // 地址范围 : [0x1000, 0x2000)
-            m_cartridge->GetMapper()->WriteCHR(address, value); // 图样表1
-            break;
-        case 0x02:  // 地址范围 : [0x2000, 0x3000)
-            // 名称表0 ：[0x2000, 0x2400)
-            // 名称表1 ：[0x2400, 0x2800)
-            // 名称表2 ：[0x2800, 0x2C00)
-            // 名称表3 ：[0x2C00, 0x3000)
-            m_VRAM[((address >> 10) & 0x01) * 0x400 + (address & 0x3ff)] = value;
-            break;
-        case 0x03:  // 地址范围 : [0x3000, 0x4000)
-            if (address < 0x3eff) // [0x2000, 0x2eff)镜像
-                PPUBusWrite(address & 0x2fff, value);
-            else
-                m_PPU.SetPalette(address & 0x1f, value);
-            break;
-        default:
-            break;
-        }
-    }
 }
