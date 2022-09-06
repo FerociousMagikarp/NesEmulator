@@ -150,5 +150,7 @@ namespace nes
 
         std::function<byte(uint16)> m_read_function;
         std::function<void(uint16, byte)> m_write_function;
+
+        friend class NesLog;
     };
 }

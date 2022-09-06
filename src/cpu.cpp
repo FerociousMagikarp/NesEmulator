@@ -2,7 +2,7 @@
 #include "cpu_instructions.h"
 #include "def.h"
 #include <iostream>
-#include <type_traits>
+#include "neslog.h"
 
 namespace nes
 {
@@ -17,31 +17,7 @@ namespace nes
         N = (1 << 7)
     };
 
-    struct InstructionInfo
-    {
-        char                  instruction_name[4];
-        CPU6502AddressingType addressing_type;
-        int                   cycles;
-    };
-
-    constexpr auto GetAllInstructionInfo()
-    {
-        std::array<InstructionInfo, 256> result{};
-
-        #define OPERATION(op_code_, instruction_, addressing_, cycles_, ...) \
-        { \
-            InstructionInfo info{#instruction_, CPU6502AddressingType::addressing_, cycles_}; \
-            result[op_code_] = info; \
-        } \
-
-        _CPU6502_ALL_INSTRUCTIONS_
-        #undef OPERATION
-
-        return result;
-    }
-
-    constexpr auto cpu_all_instruction_info = GetAllInstructionInfo();
-
+    
     CPU6502::CPU6502() noexcept
     {
         
@@ -87,7 +63,7 @@ namespace nes
         }
         // 读取指令
         byte op_code = m_read_function(m_PC++);
-        // std::cout << m_PC-1 << " : " << (int)op_code << "  " << cpu_all_instruction_info[op_code].instruction_name << std::endl;
+        // NesLog::GetInstance().ShowCPULog(this, m_PC - 1, op_code, m_read_function(m_PC), m_read_function(m_PC + 1));
         ExecuteCode(op_code);
         m_skip_cycles--; // 本周期已经执行过了，所以-1
     }
@@ -641,8 +617,8 @@ namespace nes
     bool CPU6502::RTS()
     {
         uint16 value = PullStack();
-        value |= (static_cast<uint16>(PullStack()) << 8) + 1;
-        m_PC = value;
+        value |= (static_cast<uint16>(PullStack()) << 8);
+        m_PC = value + 1;
         return false;
     }
 
