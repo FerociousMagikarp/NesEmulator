@@ -11,26 +11,26 @@ namespace nes
     class Cartridge
     {
     public:
-        Cartridge() noexcept;
-        ~Cartridge();
+        Cartridge() = default;
+        ~Cartridge() = default;
 
         bool LoadFromFile(const char *path);
         
-        inline const std::vector<std::uint8_t>& GetPRGRom() { return m_PRG_Rom; }
-        inline const std::vector<std::uint8_t>& GetCHRRom() { return m_CHR_Rom; }
+        inline const std::vector<std::uint8_t>& GetPRGRom() const { return m_PRG_Rom; }
+        inline const std::vector<std::uint8_t>& GetCHRRom() const { return m_CHR_Rom; }
         inline const std::unique_ptr<Mapper>& GetMapper() { return m_mapper; }
         inline std::uint8_t ReadPRGRam(std::uint16_t address)
         {
-            if(m_PRG_ram)  return m_PRG_ram[address];
+            if(m_PRG_Ram)  return m_PRG_Ram[address];
             else           return 0;
         }
         inline void WritePRGRam(std::uint16_t address, std::uint8_t value)
         {
-            if (m_PRG_ram) m_PRG_ram[address] = value;
+            if (m_PRG_Ram) m_PRG_Ram[address] = value;
         }
 
     private:
-        void CreateMapper();
+        bool CreateMapper();
 
     private:
         enum SpecialFlag
@@ -51,7 +51,7 @@ namespace nes
 
         std::unique_ptr<std::uint8_t[]> m_trainer = nullptr;
         std::unique_ptr<Mapper> m_mapper = nullptr;
-        std::unique_ptr<std::uint8_t[]> m_PRG_ram = nullptr;
+        std::unique_ptr<std::uint8_t[]> m_PRG_Ram = nullptr;
         std::vector<std::uint8_t> m_PRG_Rom;
         std::vector<std::uint8_t> m_CHR_Rom;
     };

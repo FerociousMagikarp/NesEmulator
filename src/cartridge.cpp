@@ -24,16 +24,6 @@ namespace nes
         std::uint8_t unused[5];
     };
 
-    Cartridge::Cartridge() noexcept
-    {
-
-    }
-
-    Cartridge::~Cartridge()
-    {
-
-    }
-
     bool Cartridge::LoadFromFile(const char* path)
     {
         std::ifstream ifstream;
@@ -45,90 +35,103 @@ namespace nes
             return false;
         }
 
+        bool load_result = false;
         NesFileHead file_head;
-        if (!ifstream.read(reinterpret_cast<char*>(&file_head), sizeof(file_head)))
-        {
-            std::cout << "Read Head Failed." << std::endl;
-            goto analyze_error;
-        }
 
-        // 检查NES标志位
-        if (file_head.identification[0] != 'N' || file_head.identification[1] != 'E' || file_head.identification[2] != 'S' || file_head.identification[3] != '\x1a')
+        do
         {
-            std::cout << "Identification wrong" << std::endl;
-            goto analyze_error;
-        }
-        // 是否是nes2.0（还没写2.0，所以先return了）
-        if ((file_head.flags7 & 0xc0) == 0x80)
-        {
-            std::cout << "NES2.0" << std::endl;
-            goto analyze_error;
-        }
-        // 设置一下标记位
-        m_special_flags |= (file_head.flags6 & 0x0f);
-        m_special_flags |= (file_head.flags7 & 0x03) << 4;
-        // TODO : flags9 flags10
-
-        // 设置mapper
-        m_mapper_id = ((file_head.flags6 & 0xf0) >> 4) | (file_head.flags7 & 0xf0);
-
-        // 读取trainer
-        if ((m_special_flags & Trainer) != 0)
-        {
-            constexpr int trainer_size = 512;
-            m_trainer = std::make_unique<std::uint8_t[]>(trainer_size);
-            if (!ifstream.read(reinterpret_cast<char*>(m_trainer.get()), trainer_size))
+            if (!ifstream.read(reinterpret_cast<char*>(&file_head), sizeof(file_head)))
             {
-                std::cout << "Read Trainer Failed." << std::endl;
-                goto analyze_error;
+                std::cout << "Read Head Failed." << std::endl;
+                break;
             }
-        }
-        // 读取PRG_ROM
-        m_PRG_Rom.resize(0x4000 * file_head.PRG_ROM_size);
-        if (!ifstream.read(reinterpret_cast<char*>(&m_PRG_Rom[0]), m_PRG_Rom.size()))
-        {
-            std::cout << "Read PRG ROM Failed." << std::endl;
-            goto analyze_error;
-        }
-        // 读取CHR_ROM
-        if (file_head.CHR_ROM_size > 0)
-        {
-            m_CHR_Rom.resize(0x2000 * file_head.CHR_ROM_size);
-            if (!ifstream.read(reinterpret_cast<char*>(&m_CHR_Rom[0]), m_CHR_Rom.size()))
-            {
-                std::cout << "Read CHR ROM Failed." << std::endl;
-                goto analyze_error;
-            }
-        }
-        // 创建额外的RAM
-        if (m_special_flags & CartridgeContainsBatteryBacked)
-        {
-            constexpr int PRG_Ram_size = 0x2000;
-            m_PRG_ram = std::make_unique<std::uint8_t[]>(PRG_Ram_size);
-        }
 
-        // TODO : Play Choice
-        
-        // 创建Mapper
-        CreateMapper();
+            // 检查NES标志位
+            if (file_head.identification[0] != 'N' || file_head.identification[1] != 'E' || file_head.identification[2] != 'S' || file_head.identification[3] != '\x1a')
+            {
+                std::cout << "Identification wrong" << std::endl;
+                break;
+            }
+            // 是否是nes2.0（还没写2.0，所以先return了）
+            if ((file_head.flags7 & 0xc0) == 0x80)
+            {
+                std::cout << "NES2.0" << std::endl;
+                break;
+            }
+            // 设置一下标记位
+            m_special_flags |= (file_head.flags6 & 0x0f);
+            m_special_flags |= (file_head.flags7 & 0x03) << 4;
+            // TODO : flags9 flags10
+
+            // 设置mapper
+            m_mapper_id = ((file_head.flags6 & 0xf0) >> 4) | (file_head.flags7 & 0xf0);
+
+            // 读取trainer
+            if ((m_special_flags & Trainer) != 0)
+            {
+                constexpr int trainer_size = 512;
+                m_trainer = std::make_unique<std::uint8_t[]>(trainer_size);
+                if (!ifstream.read(reinterpret_cast<char*>(m_trainer.get()), trainer_size))
+                {
+                    std::cout << "Read Trainer Failed." << std::endl;
+                    break;
+                }
+            }
+            // 读取PRG_ROM
+            m_PRG_Rom.resize(0x4000 * file_head.PRG_ROM_size);
+            if (!ifstream.read(reinterpret_cast<char*>(&m_PRG_Rom[0]), m_PRG_Rom.size()))
+            {
+                std::cout << "Read PRG ROM Failed." << std::endl;
+                break;
+            }
+            // 读取CHR_ROM
+            if (file_head.CHR_ROM_size > 0)
+            {
+                m_CHR_Rom.resize(0x2000 * file_head.CHR_ROM_size);
+                if (!ifstream.read(reinterpret_cast<char*>(&m_CHR_Rom[0]), m_CHR_Rom.size()))
+                {
+                    std::cout << "Read CHR ROM Failed." << std::endl;
+                    break;
+                }
+            }
+            // 创建额外的RAM
+            if (m_special_flags & CartridgeContainsBatteryBacked)
+            {
+                constexpr int PRG_Ram_size = 0x2000;
+                m_PRG_Ram = std::make_unique<std::uint8_t[]>(PRG_Ram_size);
+            }
+
+            // TODO : Play Choice
+            
+            // 创建Mapper
+            if (!CreateMapper())
+            {
+                std::cout << "Unknown mapper : " << m_mapper_id << std::endl;
+                break;
+            }
+            load_result = true;
+        } while(false);
 
         ifstream.close();
-        return true;
-    analyze_error:
-        ifstream.close();
-        return false;
+        return load_result;
     }
 
-    void Cartridge::CreateMapper()
+    bool Cartridge::CreateMapper()
     {
-        // 先这么写
+        #define MAPPER_CASE(n) \
+        case n: \
+            m_mapper = std::make_unique<Mapper##n>(this); \
+            break \
+
         switch (m_mapper_id)
         {
-        case 0:
-            m_mapper = std::make_unique<Mapper0, Cartridge*>(this);
-            break;
+            MAPPER_CASE(0);
         default:
-            break;
+            return false;
         }
+
+        #undef MAPPER_CASE
+
+        return true;
     }
 }
