@@ -58,7 +58,7 @@ namespace nes
         }
         // 读取指令
         std::uint8_t op_code = m_main_bus_read(m_PC++);
-        CPU6502Disassembly::GetInstance().ShowCPUInfo(op_code);
+        // CPU6502Disassembly::GetInstance().ShowCPUInfo(op_code);
         ExecuteCode(op_code);
         --m_skip_cycles; // 本周期已经执行过了，所以-1
     }

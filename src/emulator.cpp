@@ -1,5 +1,4 @@
 #include "emulator.h"
-#include "cartridge.h"
 #include <iostream>
 #include <memory>
 
@@ -17,12 +16,14 @@ namespace nes
 
     }
 
-    void NesEmulator::Run()
+    void NesEmulator::Run(const bool& running)
     {
         m_CPU.Reset();
         m_PPU.Reset();
-        for (int i = 0; i < 100; i++)
+        while (running)
+        {
             m_CPU.Step();
+        }
     }
 
     void NesEmulator::PutInCartridge(std::unique_ptr<Cartridge> cartridge)

@@ -4,7 +4,11 @@
 #include <string>
 #include <unordered_map>
 
-class NesEmulator;
+namespace nes
+{
+    class NesEmulator;
+    class VirtualDevice;
+}
 
 class CommandLine
 {
@@ -17,7 +21,7 @@ public:
     ~CommandLine() = default;
 
     bool Init(int argc, char** argv);
-    void Execute(const std::unique_ptr<NesEmulator>& emulator);
+    void Execute(const std::unique_ptr<nes::NesEmulator>& emulator, const std::shared_ptr<nes::VirtualDevice>& device);
     inline const std::string& GetError() const { return m_error; }
     inline const std::string& GetNesPath() const { return m_nes_path; }
 

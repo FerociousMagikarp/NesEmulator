@@ -1,4 +1,6 @@
 #include "command_line.h"
+#include "emulator.h"
+#include "virtual_device.h"
 
 constexpr const char* HELP_MESSAGE = 
 "adgdgdffdgdf";
@@ -51,4 +53,9 @@ bool CommandLine::Init(int argc, char **argv)
     }
 
     return true;
+}
+
+void CommandLine::Execute(const std::unique_ptr<nes::NesEmulator>& emulator, const std::shared_ptr<nes::VirtualDevice>& device)
+{
+
 }
