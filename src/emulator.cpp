@@ -6,9 +6,8 @@
 namespace nes
 {
     NesEmulator::NesEmulator()
+        : m_RAM(std::make_unique<std::uint8_t[]>(0x0800))
     {
-        // 分配2K内存
-        m_RAM  = std::make_unique<std::uint8_t[]>(0x0800);
         m_CPU.SetReadFunction([this](std::uint16_t addr)->std::uint8_t{ return MainBusRead(addr); });
         m_CPU.SetWriteFunction([this](std::uint16_t addr, std::uint8_t val)->void{ MainBusWrite(addr, val); });
     }
@@ -21,6 +20,7 @@ namespace nes
     void NesEmulator::Run()
     {
         m_CPU.Reset();
+        m_PPU.Reset();
         for (int i = 0; i < 100; i++)
             m_CPU.Step();
     }

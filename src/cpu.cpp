@@ -79,8 +79,8 @@ namespace nes
             return;
         if (type == CPU6502InterruptType::BRK)
             m_PC++;
-        PushStack(m_PC >> 8);
-        PushStack(m_PC);
+        PushStack(static_cast<std::uint8_t>(m_PC >> 8));
+        PushStack(static_cast<std::uint8_t>(m_PC));
         SetFlag(B, type == CPU6502InterruptType::BRK);
         PushStack(m_P);
         SetFlag(I, true);
@@ -481,8 +481,8 @@ namespace nes
     void CPU6502::JSR(std::uint16_t addr)
     {
         m_PC--;
-        PushStack(m_PC >> 8);
-        PushStack(m_PC);
+        PushStack(static_cast<std::uint8_t>(m_PC >> 8));
+        PushStack(static_cast<std::uint8_t>(m_PC));
         m_PC = addr;
     }
 

@@ -153,7 +153,7 @@ OPERATION(0x8a, TXA, Implied,     2) \
 OPERATION(0x8b, XXX, Implied,     0) \
 OPERATION(0x8c, STY, Absolute,    4) \
 OPERATION(0x8d, STA, Absolute,    4) \
-OPERATION(0x8e, STX, Absolute,    0) \
+OPERATION(0x8e, STX, Absolute,    4) \
 OPERATION(0x8f, XXX, Implied,     0) \
 OPERATION(0x90, BCC, Relative,    2) \
 OPERATION(0x91, STA, IndirectY,   6) \

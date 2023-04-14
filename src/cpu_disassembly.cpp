@@ -87,13 +87,13 @@ namespace nes
         switch (length)
         {
             case 1:
-                sprintf(data, ALL_INSTRUCTION_DATA_FORMAT[op_code]);
+                sprintf_s(data, ALL_INSTRUCTION_DATA_FORMAT[op_code]);
                 break;
             case 2:
-                sprintf(data, ALL_INSTRUCTION_DATA_FORMAT[op_code], m_CPU->m_main_bus_read(m_CPU->m_PC));
+                sprintf_s(data, ALL_INSTRUCTION_DATA_FORMAT[op_code], m_CPU->m_main_bus_read(m_CPU->m_PC));
                 break;
             case 3:
-                sprintf(data, ALL_INSTRUCTION_DATA_FORMAT[op_code],
+                sprintf_s(data, ALL_INSTRUCTION_DATA_FORMAT[op_code],
                     m_CPU->m_main_bus_read(m_CPU->m_PC) | (static_cast<std::uint16_t>(m_CPU->m_main_bus_read(m_CPU->m_PC + 1)) << 8));
                 break;
             default:
