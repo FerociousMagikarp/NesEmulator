@@ -1,14 +1,20 @@
 #include "emulator.h"
+#include <chrono>
 #include <iostream>
 #include <memory>
 
 namespace nes
 {
+    constexpr int NTSC_CPU_FREQUENCY = 1789773; // 之后精细控制时钟周期的时候再用
+
     NesEmulator::NesEmulator()
         : m_RAM(std::make_unique<std::uint8_t[]>(0x0800))
     {
         m_CPU.SetReadFunction([this](std::uint16_t addr)->std::uint8_t{ return MainBusRead(addr); });
         m_CPU.SetWriteFunction([this](std::uint16_t addr, std::uint8_t val)->void{ MainBusWrite(addr, val); });
+        m_PPU.SetReadMapperCHRCallback([this](std::uint16_t addr)->std::uint8_t { return m_cartridge->GetMapper()->ReadCHR(addr); });
+        m_PPU.SetWriteMapperCHRCallback([this](std::uint16_t addr, std::uint8_t val)->void{ m_cartridge->GetMapper()->WriteCHR(addr, val); });
+        m_PPU.SetNMICallback([this]()->void{ m_CPU.Interrupt(CPU6502InterruptType::NMI); });
     }
 
     NesEmulator::~NesEmulator()
@@ -20,9 +26,19 @@ namespace nes
     {
         m_CPU.Reset();
         m_PPU.Reset();
+        static auto last_time = std::chrono::high_resolution_clock::now();
         while (running)
         {
-            m_CPU.Step();
+            auto current_time = std::chrono::high_resolution_clock::now();
+            auto delta_time = current_time - last_time;
+            if (delta_time > std::chrono::nanoseconds(559))
+            {
+                last_time += std::chrono::nanoseconds(559);
+                m_PPU.Step();
+                m_PPU.Step();
+                m_PPU.Step();
+                m_CPU.Step();
+            }
         }
     }
 

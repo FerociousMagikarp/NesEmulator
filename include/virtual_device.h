@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <functional>
 
 namespace nes
 {
@@ -22,9 +23,19 @@ namespace nes
             inline void SetScale(int scale) { m_scale = scale; }
             inline const int GetScale() const { return m_scale; }
 
-            // TODO : 记得加锁（在制作PPU的时候）
             inline std::uint8_t* GetScreenPointer() const { return m_screen.get(); }
+            inline void SetApplicationUpdateCallback(std::function<void(void)>&& callback) { m_app_update_callback = std::move(callback); }
 
+            void ApplicationUpdate();
+            void StartPPURender();
+            void EndPPURender();
+
+            // PPU用来设置像素的，传位置和调色板索引
+            //  (x, y)
+            //  (0, 0)  (0, 1), ...
+            //  (1, 0)  (1, 1), ...
+            void SetPixel(int x, int y, int palette_index);
+            
         private:
             int m_scale = 3;
 
@@ -38,5 +49,9 @@ namespace nes
             // 读取和写入屏幕信息的时候都要加锁，控制器信息也是
             std::mutex m_mutex;
             std::condition_variable m_cond;
+
+            std::function<void(void)> m_app_update_callback;
+
+            bool m_can_app_update = false;
     };
 }

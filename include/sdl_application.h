@@ -16,7 +16,7 @@ class SDLApplication
         bool Init(int width, int height);
         void Run(bool& running);
 
-        inline void SetVirtualDevice(std::shared_ptr<nes::VirtualDevice> device) { m_device = std::move(device); }
+        void SetVirtualDevice(std::shared_ptr<nes::VirtualDevice> device);
 
     private:
         SDL_Window* m_window;

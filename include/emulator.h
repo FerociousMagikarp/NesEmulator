@@ -4,6 +4,7 @@
 #include "ppu.h"
 #include <cstdint>
 #include <memory>
+#include <chrono>
 #include "cartridge.h"
 #include "virtual_device.h"
 
@@ -20,7 +21,11 @@ namespace nes
         void PutInCartridge(std::unique_ptr<Cartridge> cartridge);
         void Run(const bool& running);
 
-        inline void SetVirtualDevice(std::shared_ptr<VirtualDevice> device) { m_device = device; }
+        inline void SetVirtualDevice(std::shared_ptr<VirtualDevice> device)
+        { 
+            m_device = device;
+            m_PPU.SetDevice(device);
+        }
 
     private:
         std::uint8_t MainBusRead(std::uint16_t address);

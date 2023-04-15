@@ -1,11 +1,14 @@
 #include "ppu.h"
+#include <cstdint>
 
 namespace nes
 {
-    PPU::PPU()
+    constexpr int SCANLINE_PER_FRAME = 262;
+    constexpr int CYCLE_PER_SCANLINE = 340;
+
+    PPU::PPU() : m_VRAM(std::make_unique<std::uint8_t[]>(0x0800))
     {
-        // 分配2K显存
-        m_VRAM = std::make_unique<std::uint8_t[]>(0x0800);
+        
     }
 
     PPU::~PPU()
@@ -14,18 +17,166 @@ namespace nes
     }
 
     void PPU::Reset()
-    {
-        
+    {   
+        m_scanline = 261;
+        m_cycle = 0;
     }
 
     void PPU::Step()
     {
-        m_register[2] |= 0x80;
+        if (m_cycle == 256 && IsRenderingEnabled())
+        {
+            // 子贡问曰：https://www.nesdev.org/wiki/PPU_scrolling#Tile_and_attribute_fetching 可抄吗？
+            // 子曰：伪代码都给你了，为啥不抄！     你怎么连注释都抄了?
+            if ((m_PPUADDR & 0x7000) != 0x7000)        // if fine Y < 7
+                m_PPUADDR += 0x1000;                   // increment fine Y
+            else
+            {
+                m_PPUADDR &= ~0x7000;                  // fine Y = 0
+                int y = (m_PPUADDR & 0x03E0) >> 5;     // let y = coarse Y
+                if (y == 29)
+                {
+                    y = 0;                             // coarse Y = 0
+                    m_PPUADDR ^= 0x0800;               // switch vertical nametable
+                }
+                else if (y == 31)
+                    y = 0;                             // coarse Y = 0, nametable not switched
+                else
+                    y += 1;                            // increment coarse Y
+                m_PPUADDR = (m_PPUADDR & ~0x03E0) | (y << 5); // put coarse Y back into v
+            }
+        }
+        else if (m_cycle == 257 && IsRenderingEnabled())
+        {
+            // v: ....A.. ...BCDEF <- t: ....A.. ...BCDEF
+            m_PPUADDR &= ~0x041f;
+            m_PPUADDR |= m_internal_register_wt & 0x041f;
+        }
+        if (m_scanline == 261) // PreRender
+            StepPreRenderScanline();
+        else if (m_scanline >= 0 && m_scanline <= 239) // Visible
+            StepVisibleScanlines();
+        else if (m_scanline == 240) // PostRender
+            StepPostRenderScanline();
+        else // m_scanline >= 241 && m_scanline <= 260, VerticalBlanking
+            StepVerticalBlankingLines();
+    }
+
+    void PPU::StepPreRenderScanline()
+    {
+        // TODO : 在280到304cycle的时候，the vertical scroll bits are reloaded if rendering is enabled
+        if (m_cycle == 1 && IsRenderingEnabled())
+        {
+            m_PPUSTATUS &= ~0xC0; // 清除sprite 0 hit和vertical blank标记
+        }
+        else if (m_cycle >= 280 && m_cycle <= 304 && IsRenderingEnabled())
+        {
+            // v: GHIA.BC DEF..... <- t: GHIA.BC DEF.....
+            m_PPUADDR &= ~0x7be0;
+            m_PPUADDR |= m_internal_register_wt & 0x7be0;
+        }
+        // 奇数帧的时候会少一个cycle，直接跳到下一个渲染
+        if (m_cycle++ >= CYCLE_PER_SCANLINE - ((m_frame & 1) && IsRenderingEnabled()))
+        {
+            m_cycle = 0;
+            m_scanline = 0;
+            m_device->StartPPURender(); // 趁这个时候把锁加上
+        }
+    }
+
+    void PPU::StepVisibleScanlines()
+    {
+        if (m_cycle == 0) // idle cycle
+        {
+        }
+        else if (m_cycle >= 1 && m_cycle <= 256) // The data for each tile is fetched during this phase.
+        {
+            auto x = (m_fine_x_scroll + m_cycle - 1) & 0x07;
+            if (IsShowBackgroundEnabled())
+            {
+                std::uint8_t background_color_index = 0;
+
+                std::uint16_t tile_addr = 0x2000 | (m_PPUADDR & 0x0fff);
+                std::uint16_t attribute_addr = 0x23c0 | (m_PPUADDR & 0x0c00) | ((m_PPUADDR >> 4) & 0x38) | ((m_PPUADDR >> 2) & 0x07);
+
+                std::uint8_t tile = PPUBusRead(tile_addr);
+                std::uint8_t attribute = PPUBusRead(attribute_addr);
+
+                std::uint16_t pattern_address = (static_cast<std::uint16_t>(tile) << 4) | ((m_PPUADDR >> 12) & 0x07) | GetBackgroundPatternTableAddress();
+                std::uint8_t pattern_lower = PPUBusRead(pattern_address);
+                std::uint8_t pattern_upper = PPUBusRead(pattern_address | 0x08);
+
+                background_color_index = (pattern_upper >> (7 - x) << 1 & 0x02) | (pattern_lower >> (7 - x) & 0x01);
+                if (background_color_index != 0)
+                {
+                    background_color_index |= ((attribute >> ((m_PPUADDR >> 4 & 0x04) | (m_PPUADDR & 2)) & 0x03) << 2);
+                }
+
+                // 这个Wiki上说的是8~256周期每8个搞一次，每个scanline都搞，但是结果不大对
+                // 这边照着SimpleNes里面的实现搞的这个，不知道为啥，好用，之后仔细研究研究
+                if (x == 7)
+                {
+                    // 宰予抄Wiki代码。子曰：朽木不可雕也，粪土之墙不可杇也。于予与何诛？
+                    if ((m_PPUADDR & 0x001F) == 31)    // if coarse X == 31
+                    {
+                        m_PPUADDR &= ~0x001F;          // coarse X = 0
+                        m_PPUADDR ^= 0x0400;           // switch horizontal nametable
+                    }
+                    else
+                        m_PPUADDR += 1;                // increment coarse X
+                }
+                m_device->SetPixel(m_scanline, m_cycle - 1, GetPalette(background_color_index & 0x1f));
+            }
+        }
+        else if (m_cycle >= 257 && m_cycle <= 320)
+        {
+        }
+        else if (m_cycle >= 321 && m_cycle <= 336)
+        {
+        }
+        else // m_cycle >= 337 && m_cycle <= 340
+        {
+        }
+
+        if (m_cycle++ >= CYCLE_PER_SCANLINE)
+        {
+            m_cycle = 0;
+            ++m_scanline;
+        }
+    }
+
+    void PPU::StepPostRenderScanline()
+    {
+        if (m_cycle == 0)
+        {
+            m_device->EndPPURender();
+        }
+        if (m_cycle++ >= CYCLE_PER_SCANLINE)
+        {
+            m_cycle = 0;
+            ++m_scanline;
+        }
+    }
+
+    void PPU::StepVerticalBlankingLines()
+    {
+        if (m_scanline == 241 && m_cycle == 1)
+        {
+            m_PPUSTATUS |= 0x80; // 设置vertical blank标记
+            if (IsNMIEnabled())
+                m_trigger_NMI();
+        }
+        if (m_cycle++ >= CYCLE_PER_SCANLINE)
+        {
+            m_cycle = 0;
+            if (++m_scanline > 260)
+                ++m_frame;
+        }
     }
 
     std::uint8_t PPU::GetRegister(std::uint16_t address)
     {
-        switch (address - 0x2000)
+        switch (address & 0x7)
         {
         case 0:
         case 1:
@@ -33,7 +184,7 @@ namespace nes
             break;
         case 2:
             // 在PPU rendering的时候设置这个标记，然后CPU去读
-            return m_register[2];
+            return GetPPUSTATUS();
         case 3:
             // Can not read OAMADDR
             break;
@@ -53,13 +204,13 @@ namespace nes
 
     void PPU::SetRegister(std::uint16_t address, std::uint8_t value)
     {
-        switch (address - 0x2000)
+        switch (address & 0x7)
         {
         case 0:
-            m_register[0] = value;
+            SetPPUCTRL(value);
             break;
         case 1:
-            m_register[1] = value;
+            m_PPUMASK = value;
             break;
         case 2:
             // Can not write PPUSTATUS
@@ -84,37 +235,73 @@ namespace nes
         }
     }
 
+    void PPU::SetPPUCTRL(std::uint8_t value)
+    {
+        m_PPUCTRL = value;
+        m_internal_register_wt &= ~0x0c00;
+        m_internal_register_wt |= (value & 0x3) << 10;
+    }
+
+    std::uint8_t PPU::GetPPUSTATUS()
+    {
+        m_internal_register_wt &= ~0x8000;
+        std::uint8_t res = m_PPUSTATUS;
+        m_PPUSTATUS &= ~0x80;
+        return res;
+    }
+
     void PPU::SetPPUSCROLL(std::uint8_t value)
     {
-        m_register[5] = value;
+        if (!(m_internal_register_wt & 0x8000))
+        {
+            // t: ....... ...ABCDE <- d: ABCDE...
+            // x:              FGH <- d: .....FGH
+            m_internal_register_wt &= ~0x1f;
+            m_internal_register_wt |= (value >> 3) & 0x1f;
+            m_fine_x_scroll = value & 0x07;
+            m_internal_register_wt |= 0x8000;
+        }
+        else
+        {
+            // t: FGH..AB CDE..... <- d: ABCDEFGH
+            m_internal_register_wt &= ~0x73e0;
+            m_internal_register_wt |= static_cast<std::uint16_t>(value & 0xf8) << 2;
+            m_internal_register_wt |= static_cast<std::uint16_t>(value & 0x07) << 12;
+            m_internal_register_wt &= ~0x8000;
+        }
     }
 
     void PPU::SetPPUADDR(std::uint8_t value)
     {
-        if (m_first_write_address)
+        if (!(m_internal_register_wt & 0x8000))
         {
-            m_tmp_address = value & 0x3f; // 地址最大就到 $3FFF, 范围外镜像
-            m_tmp_address <<= 8;
-            m_first_write_address = false;
+            m_internal_register_wt &= 0x00ff;
+            m_internal_register_wt |= (value & 0x3f) << 8;
+            m_internal_register_wt |= 0x8000;  // 把最高位的w置上
         }
         else
         {
-            m_tmp_address |= value;
-            m_data_address = m_tmp_address;
-            m_first_write_address = true;
+            m_internal_register_wt &= 0xff00;
+            m_internal_register_wt |= value;
+            m_internal_register_wt &= ~0x8000; // w标记置回去
+            m_PPUADDR = m_internal_register_wt & 0x3fff;
         }
     }
 
     void PPU::SetPPUDATA(std::uint8_t value)
     {
-        PPUBusWrite(m_data_address, value);
-        m_data_address += GetAddressIncrement();
+        PPUBusWrite(m_PPUADDR, value);
+        m_PPUADDR = (m_PPUADDR + GetAddressIncrement()) & 0x3fff;
     }
 
     std::uint8_t PPU::GetPPUDATA()
     {
-        // 还要交换buffer，麻烦，先不写了
-        return 0;
+        std::uint8_t res = m_PPUDATA_buffer;
+        m_PPUDATA_buffer = PPUBusRead(m_PPUADDR);
+        if (m_PPUADDR >= 0x3f00)
+            res = m_PPUDATA_buffer;
+        m_PPUADDR = (m_PPUADDR + GetAddressIncrement()) & 0x3fff;
+        return res;
     }
 
     std::uint8_t PPU::PPUBusRead(std::uint16_t address)
@@ -122,16 +309,19 @@ namespace nes
         switch (address >> 12)
         {
         case 0x00:  // 地址范围 : [0, 0x1000)
-            break; //return m_cartridge->GetMapper()->ReadCHR(address); // 图样表0
         case 0x01:  // 地址范围 : [0x1000, 0x2000)
-            break; //return m_cartridge->GetMapper()->ReadCHR(address); // 图样表1
+            return m_mapper_read_CHR(address);
         case 0x02:  // 地址范围 : [0x2000, 0x3000)
             // 名称表0 ：[0x2000, 0x2400)
             // 名称表1 ：[0x2400, 0x2800)
             // 名称表2 ：[0x2800, 0x2C00)
             // 名称表3 ：[0x2C00, 0x3000)
-            // 先按照名称表0,2对应显存0x0000, 1,3对应0x0400来写
-            return m_VRAM[((address >> 10) & 0x01) * 0x400 + (address & 0x3ff)];
+            // 先按照名称表0,1对应显存0x0000, 2,3对应0x0400来写
+            if (address >= 0x2800 && address < 0x2c00)
+                address -= 0x0800;
+            else if (address >= 0x2c00 && address < 0x3000)
+                address -= 0x0800;
+            return m_VRAM[address & 0x7ff];
         case 0x03:  // 地址范围 : [0x3000, 0x4000)
             if (address < 0x3eff) // [0x2000, 0x2eff)镜像
                 return PPUBusRead(address & 0x2fff);
@@ -148,17 +338,19 @@ namespace nes
         switch (address >> 12)
         {
         case 0x00:  // 地址范围 : [0, 0x1000)
-            // m_cartridge->GetMapper()->WriteCHR(address, value); // 图样表0
-            break;
         case 0x01:  // 地址范围 : [0x1000, 0x2000)
-            // m_cartridge->GetMapper()->WriteCHR(address, value); // 图样表1
+            m_mapper_write_CHR(address, value);
             break;
         case 0x02:  // 地址范围 : [0x2000, 0x3000)
             // 名称表0 ：[0x2000, 0x2400)
             // 名称表1 ：[0x2400, 0x2800)
             // 名称表2 ：[0x2800, 0x2C00)
             // 名称表3 ：[0x2C00, 0x3000)
-            m_VRAM[((address >> 10) & 0x01) * 0x400 + (address & 0x3ff)] = value;
+            if (address >= 0x2800 && address < 0x2c00)
+                address -= 0x0800;
+            else if (address >= 0x2c00 && address < 0x3000)
+                address -= 0x0800;
+            m_VRAM[address & 0x7ff] = value;
             break;
         case 0x03:  // 地址范围 : [0x3000, 0x4000)
             if (address < 0x3eff) // [0x2000, 0x2eff)镜像

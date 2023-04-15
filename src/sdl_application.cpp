@@ -20,6 +20,15 @@ bool SDLApplication::Init(int width, int height)
     return true;
 }
 
+void SDLApplication::SetVirtualDevice(std::shared_ptr<nes::VirtualDevice> device)
+{
+    device->SetApplicationUpdateCallback([this]()->void
+    {
+        SDL_UpdateTexture(m_texture, nullptr, m_device->GetScreenPointer(), nes::NES_WIDTH * 4);
+    });
+    m_device = std::move(device);
+}
+
 void SDLApplication::Run(bool &running)
 {
     while (running)
@@ -31,17 +40,16 @@ void SDLApplication::Run(bool &running)
             {
             case SDL_QUIT:
                 running = false;
-                break;
+                return;
             case SDL_KEYDOWN:
                 break;
             default:
                 break;
             }
         }
-        SDL_UpdateTexture(m_texture, nullptr, m_device->GetScreenPointer(), nes::NES_WIDTH);
+        m_device->ApplicationUpdate();
         SDL_RenderClear(m_renderer);
         SDL_RenderCopy(m_renderer, m_texture, nullptr, nullptr);
         SDL_RenderPresent(m_renderer);
-        SDL_Delay(2);
     }
 }
