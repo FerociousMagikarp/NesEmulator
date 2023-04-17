@@ -125,7 +125,7 @@ namespace nes
                     else
                         m_PPUADDR += 1;                // increment coarse X
                 }
-                m_device->SetPixel(m_scanline, m_cycle - 1, GetPalette(background_color_index & 0x1f));
+                m_device->SetPixel(m_cycle - 1, m_scanline, GetPalette(background_color_index & 0x1f));
             }
         }
         else if (m_cycle >= 257 && m_cycle <= 320)

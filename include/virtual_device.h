@@ -27,20 +27,27 @@ namespace nes
             inline void SetApplicationUpdateCallback(std::function<void(void)>&& callback) { m_app_update_callback = std::move(callback); }
 
             void ApplicationUpdate();
+            void ApplicationSetControllers(std::uint8_t controller1, std::uint8_t controller2);
+
             void StartPPURender();
             void EndPPURender();
 
+            void Write4016(std::uint8_t val);
+            std::uint8_t Read4016();
+            std::uint8_t Read4017();
+
             // PPU用来设置像素的，传位置和调色板索引
-            //  (x, y)
-            //  (0, 0)  (0, 1), ...
-            //  (1, 0)  (1, 1), ...
+            //  x :      0       1
+            //  y : 0 (0, 0)  (1, 0), ...
+            //      1 (0, 1)  (1, 1), ...
             void SetPixel(int x, int y, int palette_index);
             
         private:
             int m_scale = 3;
 
-            std::uint8_t m_controller1 = 0;
-            std::uint8_t m_controller2 = 0;
+            // 两个手柄按键放一块了，为了不加锁，先1再2
+            // 顺序 ： → ← ↓ ↑ Start Select B A
+            std::uint16_t m_controllers = 0;
             std::uint8_t m_shift_controller1 = 0;
             std::uint8_t m_shift_controller2 = 0;
 
@@ -53,5 +60,6 @@ namespace nes
             std::function<void(void)> m_app_update_callback;
 
             bool m_can_app_update = false;
+            std::uint8_t m_strobe = 0;
     };
 }

@@ -1,6 +1,12 @@
 #include "sdl_application.h"
 #include "SDL.h"
+#include "SDL_events.h"
+#include "SDL_keyboard.h"
+#include "SDL_keycode.h"
+#include "SDL_scancode.h"
 #include "virtual_device.h"
+#include <cstdint>
+#include <unordered_map>
 
 SDLApplication::~SDLApplication()
 {
@@ -31,22 +37,41 @@ void SDLApplication::SetVirtualDevice(std::shared_ptr<nes::VirtualDevice> device
 
 void SDLApplication::Run(bool &running)
 {
+    // 先这么写，之后再改
+    std::uint16_t controller = 0;
+
+    std::unordered_map<SDL_Keycode, int> keyboard_map;
+    keyboard_map[SDLK_KP_PERIOD] = 0; keyboard_map[SDLK_KP_0] = 1; keyboard_map[SDLK_KP_PLUS] = 2;   keyboard_map[SDLK_KP_ENTER] = 3;
+    keyboard_map[SDLK_UP] = 4;        keyboard_map[SDLK_DOWN] = 5; keyboard_map[SDLK_LEFT] = 6;      keyboard_map[SDLK_RIGHT] = 7;
+    keyboard_map[SDLK_k] = 8;         keyboard_map[SDLK_j] = 9;    keyboard_map[SDLK_SEMICOLON] = 10; keyboard_map[SDLK_RETURN] = 11;
+    keyboard_map[SDLK_w] = 12;        keyboard_map[SDLK_s] = 13;   keyboard_map[SDLK_a] = 14;        keyboard_map[SDLK_d] = 15;
+
     while (running)
     {
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {
+            std::unordered_map<SDL_Keycode, int>::iterator key_iter;
+
             switch (event.type)
             {
             case SDL_QUIT:
                 running = false;
                 return;
             case SDL_KEYDOWN:
+                key_iter = keyboard_map.find(event.key.keysym.sym);
+                if (key_iter != keyboard_map.end())
+                    controller |= (1 << key_iter->second);
                 break;
+            case SDL_KEYUP:
+                key_iter = keyboard_map.find(event.key.keysym.sym);
+                if (key_iter != keyboard_map.end())
+                    controller &= ~(1 << key_iter->second);
             default:
                 break;
             }
         }
+        m_device->ApplicationSetControllers(static_cast<std::uint8_t>(controller >> 8), static_cast<std::uint8_t>(controller));
         m_device->ApplicationUpdate();
         SDL_RenderClear(m_renderer);
         SDL_RenderCopy(m_renderer, m_texture, nullptr, nullptr);

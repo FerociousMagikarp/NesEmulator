@@ -57,6 +57,10 @@ namespace nes
         case 0x01:  // 地址范围 : [0x2000, 0x4000)
             return m_PPU.GetRegister(address & 0x2007);
         case 0x02:  // 地址范围 : [0x4000, 0x6000)
+            if (address == 0x4016)
+                return m_device->Read4016();
+            else if (address == 0x4017)
+                return m_device->Read4017();
             break;
         case 0x03:  // 地址范围 : [0x6000, 0x8000)
             return m_cartridge->ReadPRGRam(address & 0x1fff);
@@ -82,6 +86,8 @@ namespace nes
             m_PPU.SetRegister(address & 0x2007, value);
             break;
         case 0x02:  // 地址范围 : [0x4000, 0x6000)
+            if (address == 0x4016)
+                m_device->Write4016(value);
             break;
         case 0x03:  // 地址范围 : [0x6000, 0x8000)
             m_cartridge->WritePRGRam(address & 0x1fff, value);
