@@ -94,8 +94,8 @@ namespace nes
         PaletteColor color = DEFAULT_PALETTE[palette_index];
 
         m_screen[index] = color.b;
-        m_screen[index + 1] = color.g;
-        m_screen[index + 2] = color.r;
-        m_screen[index + 3] = color.a;
+        m_screen[index + 1ull] = color.g;
+        m_screen[index + 2ull] = color.r;
+        m_screen[index + 3ull] = color.a;
     }
 }

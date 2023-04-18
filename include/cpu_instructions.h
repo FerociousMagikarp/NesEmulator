@@ -88,7 +88,7 @@ OPERATION(0x49, EOR, Immediate,   2) \
 OPERATION(0x4a, LSR, Accumulator, 2) \
 OPERATION(0x4b, XXX, Implied,     0) \
 OPERATION(0x4c, JMP, Absolute,    3) \
-OPERATION(0x4d, EOR, Absolute,    0) \
+OPERATION(0x4d, EOR, Absolute,    4) \
 OPERATION(0x4e, LSR, Absolute,    6) \
 OPERATION(0x4f, XXX, Implied,     0) \
 OPERATION(0x50, BVC, Relative,    2) \
@@ -143,7 +143,7 @@ OPERATION(0x80, XXX, Implied,     0) \
 OPERATION(0x81, STA, IndirectX,   6) \
 OPERATION(0x82, XXX, Implied,     0) \
 OPERATION(0x83, XXX, Implied,     0) \
-OPERATION(0x84, STY, ZeroPage,    0) \
+OPERATION(0x84, STY, ZeroPage,    3) \
 OPERATION(0x85, STA, ZeroPage,    3) \
 OPERATION(0x86, STX, ZeroPage,    3) \
 OPERATION(0x87, XXX, Implied,     0) \
@@ -159,7 +159,7 @@ OPERATION(0x90, BCC, Relative,    2) \
 OPERATION(0x91, STA, IndirectY,   6) \
 OPERATION(0x92, XXX, Implied,     0) \
 OPERATION(0x93, XXX, Implied,     0) \
-OPERATION(0x94, STY, ZeroPageX,   0) \
+OPERATION(0x94, STY, ZeroPageX,   4) \
 OPERATION(0x95, STA, ZeroPageX,   4) \
 OPERATION(0x96, STX, ZeroPageY,   4) \
 OPERATION(0x97, XXX, Implied,     0) \

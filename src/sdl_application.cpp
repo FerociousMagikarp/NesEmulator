@@ -67,6 +67,7 @@ void SDLApplication::Run(bool &running)
                 key_iter = keyboard_map.find(event.key.keysym.sym);
                 if (key_iter != keyboard_map.end())
                     controller &= ~(1 << key_iter->second);
+                break;
             default:
                 break;
             }

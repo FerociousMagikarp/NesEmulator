@@ -41,10 +41,24 @@ namespace nes
 
         std::uint16_t GetVRAMAddress(std::uint16_t address);
 
+        inline bool IsRenderingCycle() const { return m_cycle >= 1 && m_cycle <= 256; }
+        inline bool IsFetchingCycle() const { return m_cycle >= 321 && m_cycle <= 336; }
+
         void StepPreRenderScanline();
         void StepVisibleScanlines();
         void StepPostRenderScanline();
         void StepVerticalBlankingLines();
+
+        void IncHorizontal();
+        void IncVertical();
+
+        void FetchingNametable();
+        void FetchingAttribute();
+        void FetchingPatternLow();
+        void FetchingPatternHigh();
+
+        void FetchingTile();
+        void ShiftTile();
 
         // PPUCTRL
         // TODO : 末两位还影响scroll？ 还有SpriteSize没写，Master/Slave Mode也没写
@@ -101,6 +115,12 @@ namespace nes
         // 这个只有末3位有用
         std::uint8_t m_fine_x_scroll = 0;
         std::uint8_t m_PPUDATA_buffer = 0;
+
+        // 记录在始终周期内从显存读到的数据
+        std::uint8_t m_nametable = 0;
+        std::uint16_t m_attribute_table = 0;
+        std::uint16_t m_pattern_low = 0;
+        std::uint16_t m_pattern_high = 0;
 
         int m_scanline = 0;
         int m_cycle = 0;

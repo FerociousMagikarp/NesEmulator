@@ -24,34 +24,6 @@ namespace nes
 
     void PPU::Step()
     {
-        if (m_cycle == 256 && IsRenderingEnabled())
-        {
-            // 子贡问曰：https://www.nesdev.org/wiki/PPU_scrolling#Tile_and_attribute_fetching 可抄吗？
-            // 子曰：伪代码都给你了，为啥不抄！     你怎么连注释都抄了?
-            if ((m_PPUADDR & 0x7000) != 0x7000)        // if fine Y < 7
-                m_PPUADDR += 0x1000;                   // increment fine Y
-            else
-            {
-                m_PPUADDR &= ~0x7000;                  // fine Y = 0
-                int y = (m_PPUADDR & 0x03E0) >> 5;     // let y = coarse Y
-                if (y == 29)
-                {
-                    y = 0;                             // coarse Y = 0
-                    m_PPUADDR ^= 0x0800;               // switch vertical nametable
-                }
-                else if (y == 31)
-                    y = 0;                             // coarse Y = 0, nametable not switched
-                else
-                    y += 1;                            // increment coarse Y
-                m_PPUADDR = (m_PPUADDR & ~0x03E0) | (y << 5); // put coarse Y back into v
-            }
-        }
-        else if (m_cycle == 257 && IsRenderingEnabled())
-        {
-            // v: ....A.. ...BCDEF <- t: ....A.. ...BCDEF
-            m_PPUADDR &= ~0x041f;
-            m_PPUADDR |= m_internal_register_wt & 0x041f;
-        }
         if (m_scanline == 261) // PreRender
             StepPreRenderScanline();
         else if (m_scanline >= 0 && m_scanline <= 239) // Visible
@@ -64,16 +36,33 @@ namespace nes
 
     void PPU::StepPreRenderScanline()
     {
-        // TODO : 在280到304cycle的时候，the vertical scroll bits are reloaded if rendering is enabled
-        if (m_cycle == 1 && IsRenderingEnabled())
+        if (IsRenderingEnabled())
         {
-            m_PPUSTATUS &= ~0xC0; // 清除sprite 0 hit和vertical blank标记
-        }
-        else if (m_cycle >= 280 && m_cycle <= 304 && IsRenderingEnabled())
-        {
-            // v: GHIA.BC DEF..... <- t: GHIA.BC DEF.....
-            m_PPUADDR &= ~0x7be0;
-            m_PPUADDR |= m_internal_register_wt & 0x7be0;
+            if (m_cycle == 1)
+            {
+                m_PPUSTATUS &= ~0xC0; // 清除sprite 0 hit和vertical blank标记
+            }
+            else if (m_cycle == 257)
+            {
+                // v: ....A.. ...BCDEF <- t: ....A.. ...BCDEF
+                m_PPUADDR &= ~0x041f;
+                m_PPUADDR |= m_internal_register_wt & 0x041f;
+            }
+            else if (m_cycle >= 280 && m_cycle <= 304)
+            {
+                // v: GHIA.BC DEF..... <- t: GHIA.BC DEF.....
+                m_PPUADDR &= ~0x7be0;
+                m_PPUADDR |= m_internal_register_wt & 0x7be0;
+            }
+            else if (IsFetchingCycle())
+            {
+                FetchingTile();
+                if (m_cycle % 8 == 0)
+                {
+                    ShiftTile();
+                    IncHorizontal();
+                }
+            }
         }
         // 奇数帧的时候会少一个cycle，直接跳到下一个渲染
         if (m_cycle++ >= CYCLE_PER_SCANLINE - ((m_frame & 1) && IsRenderingEnabled()))
@@ -86,52 +75,46 @@ namespace nes
 
     void PPU::StepVisibleScanlines()
     {
-        if (m_cycle == 0) // idle cycle
+        if (m_cycle == 0)
         {
         }
-        else if (m_cycle >= 1 && m_cycle <= 256) // The data for each tile is fetched during this phase.
+        else if (IsRenderingCycle())
         {
             auto x = (m_fine_x_scroll + m_cycle - 1) & 0x07;
             if (IsShowBackgroundEnabled())
             {
                 std::uint8_t background_color_index = 0;
 
-                std::uint16_t tile_addr = 0x2000 | (m_PPUADDR & 0x0fff);
-                std::uint16_t attribute_addr = 0x23c0 | (m_PPUADDR & 0x0c00) | ((m_PPUADDR >> 4) & 0x38) | ((m_PPUADDR >> 2) & 0x07);
-
-                std::uint8_t tile = PPUBusRead(tile_addr);
-                std::uint8_t attribute = PPUBusRead(attribute_addr);
-
-                std::uint16_t pattern_address = (static_cast<std::uint16_t>(tile) << 4) | ((m_PPUADDR >> 12) & 0x07) | GetBackgroundPatternTableAddress();
-                std::uint8_t pattern_lower = PPUBusRead(pattern_address);
-                std::uint8_t pattern_upper = PPUBusRead(pattern_address | 0x08);
-
-                background_color_index = (pattern_upper >> (7 - x) << 1 & 0x02) | (pattern_lower >> (7 - x) & 0x01);
+                background_color_index = (m_pattern_high >> (7 - x) << 1 & 0x02) | (m_pattern_low >> (7 - x) & 0x01);
                 if (background_color_index != 0)
                 {
-                    background_color_index |= ((attribute >> ((m_PPUADDR >> 4 & 0x04) | (m_PPUADDR & 2)) & 0x03) << 2);
+                    background_color_index |= (m_attribute_table & 0x0f);
                 }
 
-                // 这个Wiki上说的是8~256周期每8个搞一次，每个scanline都搞，但是结果不大对
-                // 这边照着SimpleNes里面的实现搞的这个，不知道为啥，好用，之后仔细研究研究
-                if (x == 7)
+                FetchingTile();
+                
+                if (m_cycle % 8 == 0)
                 {
-                    // 宰予抄Wiki代码。子曰：朽木不可雕也，粪土之墙不可杇也。于予与何诛？
-                    if ((m_PPUADDR & 0x001F) == 31)    // if coarse X == 31
-                    {
-                        m_PPUADDR &= ~0x001F;          // coarse X = 0
-                        m_PPUADDR ^= 0x0400;           // switch horizontal nametable
-                    }
-                    else
-                        m_PPUADDR += 1;                // increment coarse X
+                    ShiftTile();
+                    IncHorizontal();
+                }
+                if (m_cycle == 256)
+                {
+                    IncVertical();
                 }
                 m_device->SetPixel(m_cycle - 1, m_scanline, GetPalette(background_color_index & 0x1f));
             }
         }
         else if (m_cycle >= 257 && m_cycle <= 320)
         {
+            if (m_cycle == 257 && IsRenderingEnabled())
+            {
+                // v: ....A.. ...BCDEF <- t: ....A.. ...BCDEF
+                m_PPUADDR &= ~0x041f;
+                m_PPUADDR |= m_internal_register_wt & 0x041f;
+            }
         }
-        else if (m_cycle >= 321 && m_cycle <= 336)
+        else if (IsFetchingCycle())
         {
         }
         else // m_cycle >= 337 && m_cycle <= 340
@@ -172,6 +155,94 @@ namespace nes
             if (++m_scanline > 260)
                 ++m_frame;
         }
+    }
+
+    void PPU::IncHorizontal()
+    {
+        // 宰予抄Wiki代码。子曰：朽木不可雕也，粪土之墙不可杇也。于予与何诛？
+        if ((m_PPUADDR & 0x001F) == 31)    // if coarse X == 31
+        {
+            m_PPUADDR &= ~0x001F;          // coarse X = 0
+            m_PPUADDR ^= 0x0400;           // switch horizontal nametable
+        }
+        else
+            m_PPUADDR += 1;                // increment coarse X
+    }
+
+    void PPU::IncVertical()
+    {
+        // 子贡问曰：https://www.nesdev.org/wiki/PPU_scrolling#Tile_and_attribute_fetching 可抄吗？
+        // 子曰：伪代码都给你了，为啥不抄！     你怎么连注释都抄了?
+        if ((m_PPUADDR & 0x7000) != 0x7000)        // if fine Y < 7
+            m_PPUADDR += 0x1000;                   // increment fine Y
+        else
+        {
+            m_PPUADDR &= ~0x7000;                  // fine Y = 0
+            int y = (m_PPUADDR & 0x03E0) >> 5;     // let y = coarse Y
+            if (y == 29)
+            {
+                y = 0;                             // coarse Y = 0
+                m_PPUADDR ^= 0x0800;               // switch vertical nametable
+            }
+            else if (y == 31)
+                y = 0;                             // coarse Y = 0, nametable not switched
+            else
+                y += 1;                            // increment coarse Y
+            m_PPUADDR = (m_PPUADDR & ~0x03E0) | (y << 5); // put coarse Y back into v
+        }
+    }
+
+    void PPU::FetchingTile()
+    {
+        switch (m_cycle % 8)
+        {
+            case 1:
+                FetchingNametable();
+                break;
+            case 3:
+                FetchingAttribute();
+                break;
+            case 5:
+                FetchingPatternLow();
+                break;
+            case 7:
+                FetchingPatternHigh();
+                break;
+            default:
+                break;
+        }
+    }
+
+    void PPU::ShiftTile()
+    {
+        m_attribute_table >>= 8;
+        m_pattern_low >>= 8;
+        m_pattern_high >>= 8;
+    }
+
+    void PPU::FetchingNametable()
+    {
+        std::uint16_t name_addr = 0x2000 | (m_PPUADDR & 0x0fff);
+        m_nametable = PPUBusRead(name_addr);
+    }
+
+    void PPU::FetchingAttribute()
+    {
+        std::uint16_t attribute_addr = 0x23c0 | (m_PPUADDR & 0x0c00) | ((m_PPUADDR >> 4) & 0x38) | ((m_PPUADDR >> 2) & 0x07);
+        std::uint16_t attribute = PPUBusRead(attribute_addr);
+        m_attribute_table |= (attribute >> ((m_PPUADDR >> 4 & 0x04) | (m_PPUADDR & 0x02)) & 0x03) << 10;
+    }
+
+    void PPU::FetchingPatternLow()
+    {
+        std::uint16_t pattern_address = (static_cast<std::uint16_t>(m_nametable) << 4) | ((m_PPUADDR >> 12) & 0x07) | GetBackgroundPatternTableAddress();
+        m_pattern_low |= static_cast<std::uint16_t>(PPUBusRead(pattern_address)) << 8;
+    }
+
+    void PPU::FetchingPatternHigh()
+    {
+        std::uint16_t pattern_address = (static_cast<std::uint16_t>(m_nametable) << 4) | ((m_PPUADDR >> 12) & 0x07) | GetBackgroundPatternTableAddress() | 0x08;
+        m_pattern_high |= static_cast<std::uint16_t>(PPUBusRead(pattern_address)) << 8;
     }
 
     std::uint8_t PPU::GetRegister(std::uint16_t address)
