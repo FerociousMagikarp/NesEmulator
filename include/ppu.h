@@ -10,6 +10,12 @@ namespace nes
     class Cartridge;
     class Device;
 
+    enum class MirrorType
+    {
+        Horizontal,
+        Vertical,
+    };
+
     class PPU
     {
     public:
@@ -27,10 +33,13 @@ namespace nes
         inline void SetNMICallback(std::function<void()>&& callback) { m_trigger_NMI = std::move(callback); }
 
         inline void SetDevice(std::shared_ptr<VirtualDevice> device) { m_device = std::move(device); }
+        inline void SetMirrorType(MirrorType type) { m_mirror_type = type; }
 
     private:
         std::uint8_t PPUBusRead(std::uint16_t address);
         void PPUBusWrite(std::uint16_t address, std::uint8_t value);
+
+        std::uint16_t GetVRAMAddress(std::uint16_t address);
 
         void StepPreRenderScanline();
         void StepVisibleScanlines();
@@ -96,6 +105,8 @@ namespace nes
         int m_scanline = 0;
         int m_cycle = 0;
         unsigned int m_frame = 0;
+
+        MirrorType m_mirror_type;
 
         std::function<std::uint8_t(std::uint16_t)> m_mapper_read_CHR;
         std::function<void(std::uint16_t, std::uint8_t)> m_mapper_write_CHR;

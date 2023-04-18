@@ -1,4 +1,5 @@
 #include "emulator.h"
+#include "ppu.h"
 #include <chrono>
 #include <iostream>
 #include <memory>
@@ -45,6 +46,12 @@ namespace nes
     void NesEmulator::PutInCartridge(std::unique_ptr<Cartridge> cartridge)
     {
         m_cartridge = std::move(cartridge);
+
+        // 先这么写，四屏模式以后再搞
+        if (m_cartridge->IsMirroringVertical())
+            m_PPU.SetMirrorType(MirrorType::Vertical);
+        else
+            m_PPU.SetMirrorType(MirrorType::Horizontal);
     }
 
     std::uint8_t NesEmulator::MainBusRead(std::uint16_t address)

@@ -304,6 +304,25 @@ namespace nes
         return res;
     }
 
+    std::uint16_t PPU::GetVRAMAddress(std::uint16_t address)
+    {
+        switch (m_mirror_type)
+        {
+            case MirrorType::Horizontal:
+                if (address >= 0x2400 && address < 0x2c00)
+                    address -= 0x0400;
+                else if (address >= 0x2c00 && address < 0x3000)
+                    address -= 0x0800;
+                break;
+            case MirrorType::Vertical:
+                if (address >= 0x2800 && address < 0x3000)
+                    address -= 0x0800;
+                break;
+        }
+
+        return address & 0x07ff;
+    }
+
     std::uint8_t PPU::PPUBusRead(std::uint16_t address)
     {
         switch (address >> 12)
@@ -316,12 +335,7 @@ namespace nes
             // 名称表1 ：[0x2400, 0x2800)
             // 名称表2 ：[0x2800, 0x2C00)
             // 名称表3 ：[0x2C00, 0x3000)
-            // 先按照名称表0,1对应显存0x0000, 2,3对应0x0400来写
-            if (address >= 0x2800 && address < 0x2c00)
-                address -= 0x0800;
-            else if (address >= 0x2c00 && address < 0x3000)
-                address -= 0x0800;
-            return m_VRAM[address & 0x7ff];
+            return m_VRAM[GetVRAMAddress(address)];
         case 0x03:  // 地址范围 : [0x3000, 0x4000)
             if (address < 0x3eff) // [0x2000, 0x2eff)镜像
                 return PPUBusRead(address & 0x2fff);
@@ -346,11 +360,7 @@ namespace nes
             // 名称表1 ：[0x2400, 0x2800)
             // 名称表2 ：[0x2800, 0x2C00)
             // 名称表3 ：[0x2C00, 0x3000)
-            if (address >= 0x2800 && address < 0x2c00)
-                address -= 0x0800;
-            else if (address >= 0x2c00 && address < 0x3000)
-                address -= 0x0800;
-            m_VRAM[address & 0x7ff] = value;
+            m_VRAM[GetVRAMAddress(address)] = value;
             break;
         case 0x03:  // 地址范围 : [0x3000, 0x4000)
             if (address < 0x3eff) // [0x2000, 0x2eff)镜像

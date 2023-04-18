@@ -29,6 +29,8 @@ namespace nes
             if (m_PRG_Ram) m_PRG_Ram[address] = value;
         }
 
+        inline bool IsMirroringVertical() const { return m_special_flags | MirroringVertical; }
+
     private:
         bool CreateMapper();
 
