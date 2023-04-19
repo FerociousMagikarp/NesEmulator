@@ -73,6 +73,11 @@ namespace nes
         return m_main_bus_read(start_address) | (static_cast<std::uint16_t>(m_main_bus_read(start_address + 1)) << 8);
     }
 
+    void CPU6502::SkipOAMDMACycle()
+    {
+        m_skip_cycles += 513 + (m_cycles & 1);
+    }
+
     void CPU6502::InterruptExecute(CPU6502InterruptType type)
     {
         if (GetI() && type == CPU6502InterruptType::IRQ)

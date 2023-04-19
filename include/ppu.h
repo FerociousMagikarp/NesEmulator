@@ -1,9 +1,11 @@
 #pragma once
 
 #include "virtual_device.h"
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <vector>
 
 namespace nes
 {
@@ -35,6 +37,8 @@ namespace nes
         inline void SetDevice(std::shared_ptr<VirtualDevice> device) { m_device = std::move(device); }
         inline void SetMirrorType(MirrorType type) { m_mirror_type = type; }
 
+        void OAMDMA(std::uint8_t* data);
+
     private:
         std::uint8_t PPUBusRead(std::uint16_t address);
         void PPUBusWrite(std::uint16_t address, std::uint8_t value);
@@ -60,29 +64,36 @@ namespace nes
         void FetchingTile();
         void ShiftTile();
 
+        void SpriteEvaluation(int scanline);
+
         // PPUCTRL
-        // TODO : 末两位还影响scroll？ 还有SpriteSize没写，Master/Slave Mode也没写
+        // TODO : Master/Slave Mode没写
         inline int GetNametableAddress() const { return (m_PPUCTRL & 0x03); }
         inline std::uint16_t GetAddressIncrement() const { return !(m_PPUCTRL & 0x04) ? 1 : 32; }
         inline std::uint16_t GetSpritePatternTableAddress() const { return !(m_PPUCTRL & 0x08) ? 0x0000 : 0x1000; }
         inline std::uint16_t GetBackgroundPatternTableAddress() const { return !(m_PPUCTRL & 0x10) ? 0x0000 : 0x1000; }
         inline bool IsNMIEnabled() const { return static_cast<bool>(m_PPUCTRL & 0x80); }
+        inline bool IsSpriteSize8x16() const { return static_cast<bool>(m_PPUCTRL & 0x20); }
         void SetPPUCTRL(std::uint8_t value);
 
         // PPUMASK
         inline bool IsShowBackgroundEnabled() const { return static_cast<bool>(m_PPUMASK & 0x08); }
         inline bool IsShowSpriteEnabled() const { return static_cast<bool>(m_PPUMASK & 0x10); }
         inline bool IsRenderingEnabled() const { return (m_PPUMASK & 0x18) != 0; }
+        inline bool IsBothBgAndSpEnabled() const { return (m_PPUMASK & 0x18) == 0x18; }
+        inline bool IsShowBackgroundLeftmost8() const { return (m_PPUMASK & 0x02); }
+        inline bool IsShowSpriteLeftmost8() const { return (m_PPUMASK & 0x04); }
 
         // PPUSTATUS
         std::uint8_t GetPPUSTATUS();
+        inline bool IsSprite0Hit() const { return (m_PPUSTATUS & 0x40) != 0; }
 
         // OAMADDR
-        inline void SetOAMADDR(std::uint8_t value) { m_OAMADDR = value; } // 先这么写
+        void SetOAMADDR(std::uint8_t value);
 
         // OAMDATA
-        inline void SetOAMData(std::uint8_t value) { m_OAMDATA = value; }
-        inline std::uint8_t GetOAMData() const { return m_OAMDATA; }
+        void SetOAMData(std::uint8_t value);
+        std::uint8_t GetOAMData() const;
 
         // PPUSROLL
         void SetPPUSCROLL(std::uint8_t value);
@@ -108,7 +119,7 @@ namespace nes
         std::uint8_t m_OAMDATA = 0;
         std::uint16_t m_PPUADDR = 0; // 写两次
 
-        std::uint8_t m_palette[0x20];
+        std::uint8_t m_palette[0x20] = { 0 };
 
         // w一位，v15位，合并一下，这个寄存器的t位在这里是m_PPUADDR
         std::uint16_t m_internal_register_wt = 0;
@@ -122,11 +133,15 @@ namespace nes
         std::uint16_t m_pattern_low = 0;
         std::uint16_t m_pattern_high = 0;
 
+        std::array<std::uint8_t, 64 * 4> m_primary_OAM;
+        // 单纯存一下m_primary_OAM的坐标
+        std::vector<int> m_secondary_OAM;
+
         int m_scanline = 0;
         int m_cycle = 0;
         unsigned int m_frame = 0;
 
-        MirrorType m_mirror_type;
+        MirrorType m_mirror_type = MirrorType::Horizontal;
 
         std::function<std::uint8_t(std::uint16_t)> m_mapper_read_CHR;
         std::function<void(std::uint16_t, std::uint8_t)> m_mapper_write_CHR;

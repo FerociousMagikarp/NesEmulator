@@ -93,6 +93,11 @@ namespace nes
             m_PPU.SetRegister(address & 0x2007, value);
             break;
         case 0x02:  // 地址范围 : [0x4000, 0x6000)
+            if (address == 0x4014) // OAMDMA
+            {
+                m_CPU.SkipOAMDMACycle();
+                m_PPU.OAMDMA(m_RAM.get() + (value << 8));
+            }
             if (address == 0x4016)
                 m_device->Write4016(value);
             break;

@@ -1,5 +1,6 @@
 #include "ppu.h"
 #include <cstdint>
+#include <wchar.h>
 
 namespace nes
 {
@@ -8,7 +9,7 @@ namespace nes
 
     PPU::PPU() : m_VRAM(std::make_unique<std::uint8_t[]>(0x0800))
     {
-        
+        m_secondary_OAM.reserve(8);
     }
 
     PPU::~PPU()
@@ -64,6 +65,10 @@ namespace nes
                 }
             }
         }
+        if (m_cycle >= 257 && m_cycle <= 320)
+        {
+            m_OAMADDR = 0;
+        }
         // 奇数帧的时候会少一个cycle，直接跳到下一个渲染
         if (m_cycle++ >= CYCLE_PER_SCANLINE - ((m_frame & 1) && IsRenderingEnabled()))
         {
@@ -80,12 +85,13 @@ namespace nes
         }
         else if (IsRenderingCycle())
         {
-            auto x = (m_fine_x_scroll + m_cycle - 1) & 0x07;
-            if (IsShowBackgroundEnabled())
-            {
-                std::uint8_t background_color_index = 0;
+            std::uint8_t background_color_index = 0;
+            std::uint8_t sprite_color_index = 0;
 
-                background_color_index = (m_pattern_high >> (7 - x) << 1 & 0x02) | (m_pattern_low >> (7 - x) & 0x01);
+            if (IsShowBackgroundEnabled() && (IsShowBackgroundLeftmost8() || m_cycle > 8))
+            {
+                int x = (m_fine_x_scroll + m_cycle - 1) & 0x07;
+                background_color_index = ((m_pattern_high >> (7 - x) << 1) & 0x02) | (m_pattern_low >> (7 - x) & 0x01);
                 if (background_color_index != 0)
                 {
                     background_color_index |= (m_attribute_table & 0x0f);
@@ -102,8 +108,65 @@ namespace nes
                 {
                     IncVertical();
                 }
-                m_device->SetPixel(m_cycle - 1, m_scanline, GetPalette(background_color_index & 0x1f));
             }
+            if (IsShowSpriteEnabled() && (IsShowSpriteLeftmost8() || m_cycle > 8))
+            {
+                for (int i : m_secondary_OAM)
+                {
+                    int x = m_primary_OAM[i * 4 + 3];
+                    int diff_x = m_cycle - x - 1;
+                    if (diff_x >= 0 && diff_x < 8)
+                    {
+                        int y = m_primary_OAM[i * 4] + 1;
+                        int index = m_primary_OAM[i * 4 + 1];
+                        int attribute = m_primary_OAM[i * 4 + 2];
+
+                        std::uint16_t pattern_addr = 0;
+                        int diff_y = m_scanline - y;
+
+                        if ((attribute & 0x40) == 0)
+                            diff_x = 7 - diff_x;
+                        if ((attribute & 0x80) != 0)
+                            diff_y = (IsSpriteSize8x16() ? 15 : 7) - diff_y;
+
+                        if (IsSpriteSize8x16())
+                        {
+                            diff_y = (diff_y & 0x07) | ((diff_y & 0x08) << 1);
+                            pattern_addr = ((index >> 1) << 5) + diff_y;
+                            pattern_addr |= (index & 0x01) << 12;
+                        }
+                        else
+                        {
+                            pattern_addr = (index * 16 + diff_y) | GetSpritePatternTableAddress();
+                        }
+
+                        std::uint8_t color = (PPUBusRead(pattern_addr) >> diff_x) & 0x01;
+                        color |= ((PPUBusRead(pattern_addr + 8) >> diff_x) & 0x01) << 1;
+                        if (color == 0)
+                            continue;
+
+                        color |= ((attribute & 0x03) << 2) | 0x10;
+
+                        if (!IsSprite0Hit() && IsShowBackgroundEnabled() && i == 0)
+                        {
+                            m_PPUSTATUS |= 0x40;
+                        }
+                        if ((attribute & 0x20) == 0)
+                            sprite_color_index = color;
+
+                        break;
+                    }
+                }
+
+                if (m_cycle == 256)
+                {
+                    // 本来是65~256cycle去做这个事，省了，就在最后一周期搞了，以后有问题以后再说
+                    SpriteEvaluation(m_scanline + 1);
+                }
+            }
+
+            std::uint8_t color_index = sprite_color_index == 0 ? background_color_index : sprite_color_index;
+            m_device->SetPixel(m_cycle - 1, m_scanline, GetPalette(color_index & 0x1f) & 0x3f);
         }
         else if (m_cycle >= 257 && m_cycle <= 320)
         {
@@ -113,6 +176,7 @@ namespace nes
                 m_PPUADDR &= ~0x041f;
                 m_PPUADDR |= m_internal_register_wt & 0x041f;
             }
+            m_OAMADDR = 0;
         }
         else if (IsFetchingCycle())
         {
@@ -245,6 +309,26 @@ namespace nes
         m_pattern_high |= static_cast<std::uint16_t>(PPUBusRead(pattern_address)) << 8;
     }
 
+    void PPU::SpriteEvaluation(int scanline)
+    {
+        int limit = IsSpriteSize8x16() ? 16 : 8;
+        m_secondary_OAM.clear();
+
+        for (int i = 0; i < 64; i++)
+        {
+            int diff = scanline - m_primary_OAM[i * 4] - 1;
+            if (diff >= 0 && diff < limit)
+            {
+                if (m_secondary_OAM.size() >= 8)
+                {
+                    m_PPUSTATUS |= 0x20;
+                    break;
+                }
+                m_secondary_OAM.push_back(i);
+            }
+        }
+    }
+
     std::uint8_t PPU::GetRegister(std::uint16_t address)
     {
         switch (address & 0x7)
@@ -321,6 +405,25 @@ namespace nes
         return res;
     }
 
+    void PPU::SetOAMADDR(std::uint8_t value)
+    {
+        m_OAMADDR = value;
+    }
+
+    void PPU::SetOAMData(std::uint8_t value)
+    {
+        if ((m_scanline >= 240 && m_scanline <= 260) || !IsRenderingEnabled())
+            m_primary_OAM[m_OAMADDR] = value;
+        ++m_OAMADDR;
+    }
+
+    std::uint8_t PPU::GetOAMData() const
+    {
+        if (m_scanline >= 241 && m_scanline <= 260)
+            return m_primary_OAM[m_OAMADDR];
+        return 0xff;
+    }
+
     void PPU::SetPPUSCROLL(std::uint8_t value)
     {
         if (!(m_internal_register_wt & 0x8000))
@@ -392,6 +495,18 @@ namespace nes
         }
 
         return address & 0x07ff;
+    }
+
+    void PPU::OAMDMA(std::uint8_t *data)
+    {
+        // 从OAMADDR为起始下标，拷贝256字节
+        if (m_OAMADDR == 0)
+            memcpy(m_primary_OAM.data(), data, 256);
+        else
+        {
+            memcpy(m_primary_OAM.data() + m_OAMADDR, data, 256 - m_OAMADDR);
+            memcpy(m_primary_OAM.data(), data + 256 - m_OAMADDR, m_OAMADDR);
+        }
     }
 
     std::uint8_t PPU::PPUBusRead(std::uint16_t address)

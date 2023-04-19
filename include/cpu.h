@@ -36,6 +36,8 @@ namespace nes
         inline void SetReadFunction(std::function<std::uint8_t(std::uint16_t)>&& callback) { m_main_bus_read = std::move(callback); }
         inline void SetWriteFunction(std::function<void(std::uint16_t, std::uint8_t)>&& callback) { m_main_bus_write = std::move(callback); }
 
+        void SkipOAMDMACycle();
+
         // 获取状态寄存器
         inline bool GetC() const { return m_P & 0x01; }
         inline bool GetZ() const { return m_P & 0x02; }
