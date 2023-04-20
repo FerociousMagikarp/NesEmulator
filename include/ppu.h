@@ -61,9 +61,6 @@ namespace nes
         void FetchingPatternLow();
         void FetchingPatternHigh();
 
-        void FetchingTile();
-        void ShiftTile();
-
         void SpriteEvaluation(int scanline);
 
         // PPUCTRL
@@ -129,9 +126,9 @@ namespace nes
 
         // 记录在始终周期内从显存读到的数据
         std::uint8_t m_nametable = 0;
-        std::uint16_t m_attribute_table = 0;
-        std::uint16_t m_pattern_low = 0;
-        std::uint16_t m_pattern_high = 0;
+        std::uint8_t m_attribute_table = 0;
+        std::uint8_t m_pattern_low = 0;
+        std::uint8_t m_pattern_high = 0;
 
         std::array<std::uint8_t, 64 * 4> m_primary_OAM;
         // 单纯存一下m_primary_OAM的坐标

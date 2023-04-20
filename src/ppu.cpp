@@ -55,15 +55,6 @@ namespace nes
                 m_PPUADDR &= ~0x7be0;
                 m_PPUADDR |= m_internal_register_wt & 0x7be0;
             }
-            else if (IsFetchingCycle())
-            {
-                FetchingTile();
-                if (m_cycle % 8 == 0)
-                {
-                    ShiftTile();
-                    IncHorizontal();
-                }
-            }
         }
         if (m_cycle >= 257 && m_cycle <= 320)
         {
@@ -82,26 +73,50 @@ namespace nes
     {
         if (m_cycle == 0)
         {
+            // 本来这个周期不该做事的，但是我想通了
+            // 如果真按照PPU的时序走，在非渲染时会有写入数据的可能，然后CPU那边代码shi导致这边也被影响了
+            // 所以只要能保证一个scanline里IncHorizontal执行33次就行了
+            // F1赛车的模拟会有些问题
+            // 之后CPU那边时序测的没问题了再搞PPU的时序
+            if (m_fine_x_scroll != 0)
+            {
+                FetchingNametable();
+                FetchingAttribute();
+                FetchingPatternLow();
+                FetchingPatternHigh();
+            }
         }
         else if (IsRenderingCycle())
         {
             std::uint8_t background_color_index = 0;
             std::uint8_t sprite_color_index = 0;
+            bool bg_transparent = false;
+            bool sp_foreground = false;
 
             if (IsShowBackgroundEnabled() && (IsShowBackgroundLeftmost8() || m_cycle > 8))
             {
                 int x = (m_fine_x_scroll + m_cycle - 1) & 0x07;
+
+                if (x == 0)
+                {
+                    FetchingNametable();
+                    FetchingAttribute();
+                    FetchingPatternLow();
+                    FetchingPatternHigh();
+                }
+
                 background_color_index = ((m_pattern_high >> (7 - x) << 1) & 0x02) | (m_pattern_low >> (7 - x) & 0x01);
                 if (background_color_index != 0)
                 {
-                    background_color_index |= (m_attribute_table & 0x0f);
+                    background_color_index |= m_attribute_table << 2;
                 }
-
-                FetchingTile();
-                
-                if (m_cycle % 8 == 0)
+                else
                 {
-                    ShiftTile();
+                    bg_transparent = true;
+                }
+                
+                if (x == 7)
+                {
                     IncHorizontal();
                 }
                 if (m_cycle == 256)
@@ -113,13 +128,13 @@ namespace nes
             {
                 for (int i : m_secondary_OAM)
                 {
-                    int x = m_primary_OAM[i * 4 + 3];
+                    int x = m_primary_OAM[(i << 2) | 3];
                     int diff_x = m_cycle - x - 1;
                     if (diff_x >= 0 && diff_x < 8)
                     {
-                        int y = m_primary_OAM[i * 4] + 1;
-                        int index = m_primary_OAM[i * 4 + 1];
-                        int attribute = m_primary_OAM[i * 4 + 2];
+                        int y = m_primary_OAM[(i << 2) | 0] + 1;
+                        int index = m_primary_OAM[(i << 2) | 1];
+                        int attribute = m_primary_OAM[(i << 2) | 2];
 
                         std::uint16_t pattern_addr = 0;
                         int diff_y = m_scanline - y;
@@ -137,7 +152,7 @@ namespace nes
                         }
                         else
                         {
-                            pattern_addr = (index * 16 + diff_y) | GetSpritePatternTableAddress();
+                            pattern_addr = ((index << 4) | diff_y) | GetSpritePatternTableAddress();
                         }
 
                         std::uint8_t color = (PPUBusRead(pattern_addr) >> diff_x) & 0x01;
@@ -147,12 +162,12 @@ namespace nes
 
                         color |= ((attribute & 0x03) << 2) | 0x10;
 
-                        if (!IsSprite0Hit() && IsShowBackgroundEnabled() && i == 0)
+                        if (!IsSprite0Hit() && IsShowBackgroundEnabled() && i == 0 && !bg_transparent)
                         {
                             m_PPUSTATUS |= 0x40;
                         }
-                        if ((attribute & 0x20) == 0)
-                            sprite_color_index = color;
+                        sp_foreground = (attribute & 0x20) == 0;
+                        sprite_color_index = color;
 
                         break;
                     }
@@ -165,7 +180,12 @@ namespace nes
                 }
             }
 
-            std::uint8_t color_index = sprite_color_index == 0 ? background_color_index : sprite_color_index;
+            std::uint8_t color_index = 0;
+            if (bg_transparent || sp_foreground)
+                color_index = sprite_color_index;
+            else
+                color_index = background_color_index;
+            
             m_device->SetPixel(m_cycle - 1, m_scanline, GetPalette(color_index & 0x1f) & 0x3f);
         }
         else if (m_cycle >= 257 && m_cycle <= 320)
@@ -177,12 +197,6 @@ namespace nes
                 m_PPUADDR |= m_internal_register_wt & 0x041f;
             }
             m_OAMADDR = 0;
-        }
-        else if (IsFetchingCycle())
-        {
-        }
-        else // m_cycle >= 337 && m_cycle <= 340
-        {
         }
 
         if (m_cycle++ >= CYCLE_PER_SCANLINE)
@@ -256,34 +270,6 @@ namespace nes
         }
     }
 
-    void PPU::FetchingTile()
-    {
-        switch (m_cycle % 8)
-        {
-            case 1:
-                FetchingNametable();
-                break;
-            case 3:
-                FetchingAttribute();
-                break;
-            case 5:
-                FetchingPatternLow();
-                break;
-            case 7:
-                FetchingPatternHigh();
-                break;
-            default:
-                break;
-        }
-    }
-
-    void PPU::ShiftTile()
-    {
-        m_attribute_table >>= 8;
-        m_pattern_low >>= 8;
-        m_pattern_high >>= 8;
-    }
-
     void PPU::FetchingNametable()
     {
         std::uint16_t name_addr = 0x2000 | (m_PPUADDR & 0x0fff);
@@ -293,20 +279,19 @@ namespace nes
     void PPU::FetchingAttribute()
     {
         std::uint16_t attribute_addr = 0x23c0 | (m_PPUADDR & 0x0c00) | ((m_PPUADDR >> 4) & 0x38) | ((m_PPUADDR >> 2) & 0x07);
-        std::uint16_t attribute = PPUBusRead(attribute_addr);
-        m_attribute_table |= (attribute >> ((m_PPUADDR >> 4 & 0x04) | (m_PPUADDR & 0x02)) & 0x03) << 10;
+        m_attribute_table = PPUBusRead(attribute_addr) >> ((m_PPUADDR >> 4 & 0x04) | (m_PPUADDR & 0x02)) & 0x03;
     }
 
     void PPU::FetchingPatternLow()
     {
         std::uint16_t pattern_address = (static_cast<std::uint16_t>(m_nametable) << 4) | ((m_PPUADDR >> 12) & 0x07) | GetBackgroundPatternTableAddress();
-        m_pattern_low |= static_cast<std::uint16_t>(PPUBusRead(pattern_address)) << 8;
+        m_pattern_low = PPUBusRead(pattern_address);
     }
 
     void PPU::FetchingPatternHigh()
     {
         std::uint16_t pattern_address = (static_cast<std::uint16_t>(m_nametable) << 4) | ((m_PPUADDR >> 12) & 0x07) | GetBackgroundPatternTableAddress() | 0x08;
-        m_pattern_high |= static_cast<std::uint16_t>(PPUBusRead(pattern_address)) << 8;
+        m_pattern_high = PPUBusRead(pattern_address);
     }
 
     void PPU::SpriteEvaluation(int scanline)
