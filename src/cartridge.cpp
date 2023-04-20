@@ -6,7 +6,7 @@
 #include <iostream>
 #include <memory>
 #include <stdio.h>
-#include "mappers/mapper0.h"
+#include "mappers/mapper_headers.h"
 
 
 namespace nes
@@ -78,7 +78,7 @@ namespace nes
                 }
             }
             // 读取PRG_ROM
-            m_PRG_Rom.resize(0x4000 * file_head.PRG_ROM_size);
+            m_PRG_Rom.resize(0x4000ull * file_head.PRG_ROM_size);
             if (!ifstream.read(reinterpret_cast<char*>(&m_PRG_Rom[0]), m_PRG_Rom.size()))
             {
                 std::cout << "Read PRG ROM Failed." << std::endl;
@@ -87,13 +87,18 @@ namespace nes
             // 读取CHR_ROM
             if (file_head.CHR_ROM_size > 0)
             {
-                m_CHR_Rom.resize(0x2000 * file_head.CHR_ROM_size);
+                m_CHR_Rom.resize(0x2000ull * file_head.CHR_ROM_size);
                 if (!ifstream.read(reinterpret_cast<char*>(&m_CHR_Rom[0]), m_CHR_Rom.size()))
                 {
                     std::cout << "Read CHR ROM Failed." << std::endl;
                     break;
                 }
             }
+
+            // 输出rom大小
+            std::cout << "PRG Rom size : " << static_cast<std::uint32_t>(file_head.PRG_ROM_size) * 16 << "KB"
+                << ", CHR Rom size : " << static_cast<std::uint32_t>(file_head.CHR_ROM_size) * 8 << "KB" << "\n";
+
             // 创建额外的RAM
             if (m_special_flags & CartridgeContainsBatteryBacked)
             {
@@ -126,6 +131,7 @@ namespace nes
         switch (m_mapper_id)
         {
             MAPPER_CASE(0);
+            MAPPER_CASE(2);
         default:
             return false;
         }
