@@ -142,6 +142,28 @@ namespace nes
         // 扩展用的指令及寻址方式
         inline void  XXX() {}
 
+        // 未记录指令
+        std::uint8_t SLO(std::uint8_t src);
+        std::uint8_t RLA(std::uint8_t src);
+        std::uint8_t SRE(std::uint8_t src);
+        std::uint8_t RRA(std::uint8_t src);
+        std::uint8_t SAX();
+        void         LAX(std::uint8_t src);
+        std::uint8_t DCP(std::uint8_t src);
+        std::uint8_t ISC(std::uint8_t src);
+
+        // 其余指令不做实现
+        inline void  ANC() {}
+        inline void  ALR() {}
+        inline void  ARR() {}
+        inline void  XAA() {}
+        inline void  AXS() {}
+        inline void  AHX() {}
+        inline void  SHY() {}
+        inline void  SHX() {}
+        inline void  TAS() {}
+        inline void  LAS() {}
+
     private:
         // 程序计数器
         std::uint16_t m_PC = 0;

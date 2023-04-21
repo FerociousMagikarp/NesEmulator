@@ -671,4 +671,89 @@ namespace nes
         SetFlag(Z, m_Y == 0);
         m_A = m_Y;
     }
+
+    // =========================================
+    // 未记录指令 (unofficial opcodes)
+    // =========================================
+    std::uint8_t CPU6502::SLO(std::uint8_t src)
+    {
+        std::uint8_t val = src << 1;
+        SetFlag(C, src & 0x80);
+        m_A |= val;
+        SetFlag(N, m_A & 0x80);
+        SetFlag(Z, m_A == 0);
+        return val;
+    }
+
+    std::uint8_t CPU6502::RLA(std::uint8_t src)
+    {
+        bool carry = static_cast<bool>(src & 0x80);
+        src = (src << 1) | (GetC() ? 1 : 0);
+        SetFlag(C, carry);
+        m_A &= src;
+        SetFlag(N, m_A & 0x80);
+        SetFlag(Z, m_A == 0);
+        return src;
+    }
+
+    std::uint8_t CPU6502::SRE(std::uint8_t src)
+    {
+        SetFlag(C, src & 0x01);
+        std::uint8_t val = src >> 1;
+        m_A ^= val;
+        SetFlag(N, m_A & 0x80);
+        SetFlag(Z, m_A == 0);
+        return val;
+    }
+
+    std::uint8_t CPU6502::RRA(std::uint8_t src)
+    {
+        auto tmp_C = src & 0x01;
+        src = (src >> 1) | (GetC() ? 0x80 : 0);
+
+        std::uint16_t tmp = static_cast<std::uint16_t>(src) + m_A + tmp_C;
+        SetFlag(Z, (tmp & 0xff) == 0);
+        SetFlag(N, tmp & 0x80);
+        SetFlag(C, tmp > 0xff);
+        SetFlag(V, (tmp ^ m_A) & (tmp ^ src) & 0x80);
+        m_A = static_cast<std::uint8_t>(tmp & 0xff);
+
+        return src;
+    }
+
+    std::uint8_t CPU6502::SAX()
+    {
+        return m_A & m_X;
+    }
+
+    void CPU6502::LAX(std::uint8_t src)
+    {
+        m_A = src;
+        m_X = src;
+        SetFlag(N, src & 0x80);
+        SetFlag(Z, src == 0);
+    }
+
+    std::uint8_t CPU6502::DCP(std::uint8_t src)
+    {
+        --src;
+        SetFlag(C, m_A >= src);
+        SetFlag(N, (m_A - src) & 0x80);
+        SetFlag(Z, src == m_A);
+        return src;
+    }
+
+    std::uint8_t CPU6502::ISC(std::uint8_t src)
+    {
+        ++src;
+        
+        std::uint16_t tmp = m_A - src - (GetC() ? 0 : 1);
+        SetFlag(Z, (tmp & 0xff) == 0);
+        SetFlag(N, tmp & 0x80);
+        SetFlag(C, tmp < 0x100);
+        SetFlag(V, (tmp ^ m_A) & (tmp ^ ~src) & 0x80);
+        m_A = static_cast<std::uint8_t>(tmp & 0xff);
+
+        return src;
+    }
 }
