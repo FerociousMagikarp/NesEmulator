@@ -59,6 +59,8 @@ namespace nes
         if (m_cycle >= 257 && m_cycle <= 320)
         {
             m_OAMADDR = 0;
+            if (m_cycle == 260 && IsBothBgAndSpEnabled())
+                m_mapper_reduce_IRQ_counter();
         }
         // 奇数帧的时候会少一个cycle，直接跳到下一个渲染
         if (m_cycle++ >= CYCLE_PER_SCANLINE - ((m_frame & 1) && IsRenderingEnabled()))
@@ -196,6 +198,8 @@ namespace nes
                 m_PPUADDR &= ~0x041f;
                 m_PPUADDR |= m_internal_register_wt & 0x041f;
             }
+            if (m_cycle == 260 && IsBothBgAndSpEnabled())
+                m_mapper_reduce_IRQ_counter();
             m_OAMADDR = 0;
         }
 

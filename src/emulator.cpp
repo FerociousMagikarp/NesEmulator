@@ -1,4 +1,5 @@
 #include "emulator.h"
+#include "cpu.h"
 #include "ppu.h"
 #include <chrono>
 #include <iostream>
@@ -56,6 +57,14 @@ namespace nes
         m_cartridge->GetMapper()->OnMirroringChanged([this](MirroringType type)->void
         {
             m_PPU.SetMirrorType(type);
+        });
+        m_cartridge->GetMapper()->SetTriggerIRQCallback([this]()->void
+        {
+            m_CPU.Interrupt(CPU6502InterruptType::IRQ);
+        });
+        m_PPU.SetMapperReduceIRQCounterCallback([this]()->void
+        {
+            m_cartridge->GetMapper()->ReduceIRQCounter();
         });
     }
 

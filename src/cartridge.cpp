@@ -142,6 +142,7 @@ namespace nes
             MAPPER_CASE(0);
             MAPPER_CASE(1);
             MAPPER_CASE(2);
+            MAPPER_CASE(4);
         default:
             return false;
         }

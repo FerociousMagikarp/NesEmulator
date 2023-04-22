@@ -20,7 +20,9 @@ namespace nes
         virtual void WriteCHR(std::uint16_t address, std::uint8_t value) = 0;
 
         virtual bool HasExtendPRGRam() const { return false; }
-        virtual void OnMirroringChanged(std::function<void(MirroringType)>&& callback) { m_on_morroring_changed = std::move(callback); }
+        void OnMirroringChanged(std::function<void(MirroringType)>&& callback) { m_on_morroring_changed = std::move(callback); }
+        virtual void SetTriggerIRQCallback(std::function<void(void)>&& callback) {}
+        virtual void ReduceIRQCounter() {}
 
     protected:
         Cartridge* m_cartridge;

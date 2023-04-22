@@ -28,6 +28,7 @@ namespace nes
 
         inline void SetReadMapperCHRCallback(std::function<std::uint8_t(std::uint16_t)>&& callback) { m_mapper_read_CHR = std::move(callback); }
         inline void SetWriteMapperCHRCallback(std::function<void(std::uint16_t, std::uint8_t)>&& callback) { m_mapper_write_CHR = std::move(callback); }
+        inline void SetMapperReduceIRQCounterCallback(std::function<void(void)>&& callback) { m_mapper_reduce_IRQ_counter = std::move(callback); }
         inline void SetNMICallback(std::function<void()>&& callback) { m_trigger_NMI = std::move(callback); }
 
         inline void SetDevice(std::shared_ptr<VirtualDevice> device) { m_device = std::move(device); }
@@ -139,6 +140,7 @@ namespace nes
         std::function<std::uint8_t(std::uint16_t)> m_mapper_read_CHR;
         std::function<void(std::uint16_t, std::uint8_t)> m_mapper_write_CHR;
         std::function<void()> m_trigger_NMI;
+        std::function<void()> m_mapper_reduce_IRQ_counter;
 
         std::shared_ptr<VirtualDevice> m_device;
     };
