@@ -6,17 +6,13 @@
 #include <functional>
 #include <memory>
 #include <vector>
+#include "def.h"
 
 namespace nes
 {
     class Cartridge;
     class Device;
 
-    enum class MirrorType
-    {
-        Horizontal,
-        Vertical,
-    };
 
     class PPU
     {
@@ -35,7 +31,7 @@ namespace nes
         inline void SetNMICallback(std::function<void()>&& callback) { m_trigger_NMI = std::move(callback); }
 
         inline void SetDevice(std::shared_ptr<VirtualDevice> device) { m_device = std::move(device); }
-        inline void SetMirrorType(MirrorType type) { m_mirror_type = type; }
+        inline void SetMirrorType(MirroringType type) { m_mirror_type = type; }
 
         void OAMDMA(std::uint8_t* data);
 
@@ -138,7 +134,7 @@ namespace nes
         int m_cycle = 0;
         unsigned int m_frame = 0;
 
-        MirrorType m_mirror_type = MirrorType::Horizontal;
+        MirroringType m_mirror_type = MirroringType::Horizontal;
 
         std::function<std::uint8_t(std::uint16_t)> m_mapper_read_CHR;
         std::function<void(std::uint16_t, std::uint8_t)> m_mapper_write_CHR;

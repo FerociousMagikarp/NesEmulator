@@ -49,9 +49,14 @@ namespace nes
 
         // 先这么写，四屏模式以后再搞
         if (m_cartridge->IsMirroringVertical())
-            m_PPU.SetMirrorType(MirrorType::Vertical);
+            m_PPU.SetMirrorType(MirroringType::Vertical);
         else
-            m_PPU.SetMirrorType(MirrorType::Horizontal);
+            m_PPU.SetMirrorType(MirroringType::Horizontal);
+
+        m_cartridge->GetMapper()->OnMirroringChanged([this](MirroringType type)->void
+        {
+            m_PPU.SetMirrorType(type);
+        });
     }
 
     std::uint8_t NesEmulator::MainBusRead(std::uint16_t address)

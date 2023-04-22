@@ -98,11 +98,13 @@ namespace nes
             // 输出rom大小
             std::cout << "PRG Rom size : " << static_cast<std::uint32_t>(file_head.PRG_ROM_size) * 16 << "KB"
                 << ", CHR Rom size : " << static_cast<std::uint32_t>(file_head.CHR_ROM_size) * 8 << "KB" << "\n";
+            // 输出mapper编号
+            std::cout << "Mapper ID : " << m_mapper_id << "\n";
 
+            constexpr int PRG_Ram_size = 0x2000;
             // 创建额外的RAM
             if (m_special_flags & CartridgeContainsBatteryBacked)
             {
-                constexpr int PRG_Ram_size = 0x2000;
                 m_PRG_Ram = std::make_unique<std::uint8_t[]>(PRG_Ram_size);
             }
 
@@ -114,6 +116,13 @@ namespace nes
                 std::cout << "Unknown mapper : " << m_mapper_id << std::endl;
                 break;
             }
+
+            // 上面那个额外ram标记就跟闹着玩一样。如果mapper需要标记，但是上面没创建，就再创建一遍
+            if (m_PRG_Ram == nullptr && m_mapper->HasExtendPRGRam())
+            {
+                m_PRG_Ram = std::make_unique<std::uint8_t[]>(PRG_Ram_size);
+            }
+
             load_result = true;
         } while(false);
 
@@ -131,6 +140,7 @@ namespace nes
         switch (m_mapper_id)
         {
             MAPPER_CASE(0);
+            MAPPER_CASE(1);
             MAPPER_CASE(2);
         default:
             return false;

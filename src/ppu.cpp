@@ -467,15 +467,21 @@ namespace nes
     {
         switch (m_mirror_type)
         {
-            case MirrorType::Horizontal:
+            case MirroringType::Horizontal:
                 if (address >= 0x2400 && address < 0x2c00)
                     address -= 0x0400;
                 else if (address >= 0x2c00 && address < 0x3000)
                     address -= 0x0800;
                 break;
-            case MirrorType::Vertical:
+            case MirroringType::Vertical:
                 if (address >= 0x2800 && address < 0x3000)
                     address -= 0x0800;
+                break;
+            case MirroringType::OneScreenLowerBank:
+                address &= 0x3ff;
+                break;
+            case MirroringType::OneScreenUpperBank:
+                address = (address & 0x3ff) + 0x0400;
                 break;
         }
 
