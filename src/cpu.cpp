@@ -151,9 +151,6 @@ namespace nes
 
     void CPU6502::ExecuteCode(std::uint8_t op_code)
     {
-        // 为可能使用到的地址
-        std::uint16_t address = m_PC - 1;
-
         #define OPERATION(op_code_, instruction_, addressing_, cycles_, ...) \
         case op_code_: \
             if constexpr (std::is_same_v<decltype(addressing_()), int>) \
@@ -163,7 +160,7 @@ namespace nes
             m_skip_cycles += cycles_; \
             if constexpr (0##__VA_ARGS__) \
             { \
-                if ((this->m_PC & 0xff00) != (address & 0xff00)) \
+                if (m_cross_page) \
                     m_skip_cycles += 1; \
             } \
             break; \
@@ -209,6 +206,7 @@ namespace nes
     {
         std::uint16_t address = m_main_bus_read(m_PC++);
         address |= static_cast<std::uint16_t>(m_main_bus_read(m_PC++)) << 8;
+        m_cross_page = (address ^ (address + m_X)) >> 8 != 0;
         address += m_X;
         return address;
     }
@@ -217,6 +215,7 @@ namespace nes
     {
         std::uint16_t address = m_main_bus_read(m_PC++);
         address |= static_cast<std::uint16_t>(m_main_bus_read(m_PC++)) << 8;
+        m_cross_page = (address ^ (address + m_Y)) >> 8 != 0;
         address += m_Y;
         return address;
     }
@@ -259,6 +258,7 @@ namespace nes
         std::uint16_t op = static_cast<std::uint16_t>(m_main_bus_read(m_PC++));
         std::uint16_t address = m_main_bus_read(op);
         address |= static_cast<std::uint16_t>(m_main_bus_read((op + 1) & 0xff)) << 8;
+        m_cross_page = (address ^ (address + m_Y)) >> 8 != 0;
         address += m_Y;
         return address;
     }

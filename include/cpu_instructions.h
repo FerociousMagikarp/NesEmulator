@@ -28,7 +28,7 @@ OPERATION(0x0d, ORA, Absolute,    4) \
 OPERATION(0x0e, ASL, Absolute,    6) \
 OPERATION(0x0f, SLO, Absolute,    6) \
 OPERATION(0x10, BPL, Relative,    2) \
-OPERATION(0x11, ORA, IndirectY,   5) \
+OPERATION(0x11, ORA, IndirectY,   5, 1) \
 OPERATION(0x12, XXX, Implied,     0) \
 OPERATION(0x13, SLO, IndirectY,   8) \
 OPERATION(0x14, NOP, ZeroPageX,   4) \
@@ -60,7 +60,7 @@ OPERATION(0x2d, AND, Absolute,    4) \
 OPERATION(0x2e, ROL, Absolute,    6) \
 OPERATION(0x2f, RLA, Absolute,    6) \
 OPERATION(0x30, BMI, Relative,    2) \
-OPERATION(0x31, AND, IndirectY,   5) \
+OPERATION(0x31, AND, IndirectY,   5, 1) \
 OPERATION(0x32, XXX, Implied,     0) \
 OPERATION(0x33, RLA, IndirectY,   8) \
 OPERATION(0x34, NOP, ZeroPageX,   4) \
@@ -252,7 +252,7 @@ OPERATION(0xed, SBC, Absolute,    4) \
 OPERATION(0xee, INC, Absolute,    6) \
 OPERATION(0xef, ISC, Absolute,    6) \
 OPERATION(0xf0, BEQ, Relative,    2) \
-OPERATION(0xf1, SBC, IndirectY,   5) \
+OPERATION(0xf1, SBC, IndirectY,   5, 1) \
 OPERATION(0xf2, XXX, Implied,     0) \
 OPERATION(0xf3, ISC, IndirectY,   8) \
 OPERATION(0xf4, NOP, ZeroPageX,   4) \

@@ -182,6 +182,9 @@ namespace nes
 
         // 需要跳过的周期数
         std::uint16_t m_skip_cycles = 0;
+        // 跳页加周期的指令是否跳页了
+        bool m_cross_page = false;
+
         // 总的周期数
         std::uint32_t m_cycles = 0;
 
