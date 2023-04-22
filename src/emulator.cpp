@@ -17,6 +17,7 @@ namespace nes
         m_PPU.SetReadMapperCHRCallback([this](std::uint16_t addr)->std::uint8_t { return m_cartridge->GetMapper()->ReadCHR(addr); });
         m_PPU.SetWriteMapperCHRCallback([this](std::uint16_t addr, std::uint8_t val)->void{ m_cartridge->GetMapper()->WriteCHR(addr, val); });
         m_PPU.SetNMICallback([this]()->void{ m_CPU.Interrupt(CPU6502InterruptType::NMI); });
+        m_APU.SetIRQCallback([this]()->void{ m_CPU.Interrupt(CPU6502InterruptType::IRQ); });
     }
 
     NesEmulator::~NesEmulator()
@@ -78,7 +79,9 @@ namespace nes
         case 0x01:  // 地址范围 : [0x2000, 0x4000)
             return m_PPU.GetRegister(address & 0x2007);
         case 0x02:  // 地址范围 : [0x4000, 0x6000)
-            if (address == 0x4016)
+            if (address == 0x4015)
+                return m_APU.ReadStatus();
+            else if (address == 0x4016)
                 return m_device->Read4016();
             else if (address == 0x4017)
                 return m_device->Read4017();
@@ -107,7 +110,9 @@ namespace nes
             m_PPU.SetRegister(address & 0x2007, value);
             break;
         case 0x02:  // 地址范围 : [0x4000, 0x6000)
-            if (address == 0x4014) // OAMDMA
+            if (address <= 0x4013 || address == 0x4015 || address == 0x4017)  // 所有写APU的都算进去了
+                m_APU.SetRegister(address, value);
+            else if (address == 0x4014) // OAMDMA
             {
                 m_CPU.SkipOAMDMACycle();
                 m_PPU.OAMDMA(m_RAM.get() + (value << 8));

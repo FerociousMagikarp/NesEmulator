@@ -2,6 +2,7 @@
 
 #include "cpu.h"
 #include "ppu.h"
+#include "apu.h"
 #include <cstdint>
 #include <memory>
 #include <chrono>
@@ -39,5 +40,6 @@ namespace nes
 
         CPU6502 m_CPU;
         PPU     m_PPU;
+        APU     m_APU;
     };
 }
