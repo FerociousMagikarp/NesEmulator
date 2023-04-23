@@ -1,12 +1,8 @@
 #include "sdl_application.h"
 #include "SDL.h"
-#include "SDL_events.h"
-#include "SDL_keyboard.h"
-#include "SDL_keycode.h"
-#include "SDL_scancode.h"
+#include "def.h"
 #include "virtual_device.h"
 #include <cstdint>
-#include <unordered_map>
 
 SDLApplication::~SDLApplication()
 {
@@ -35,23 +31,75 @@ void SDLApplication::SetVirtualDevice(std::shared_ptr<nes::VirtualDevice> device
     m_device = std::move(device);
 }
 
+void SDLApplication::KeyDown(nes::InputKey key, int player)
+{
+    if (key != nes::InputKey::TurboA && key != nes::InputKey::TurboB)
+    {
+        m_joy |= 1 << (static_cast<int>(key) + player * 8);
+    }
+    else
+    {
+        int key_index = static_cast<int>(key != nes::InputKey::TurboA);
+        int turbo_index = key_index + player * 2;
+        if (!m_turbo_keys[turbo_index].enable)
+        {
+            m_turbo_keys[turbo_index].enable = true;
+            m_turbo_keys[turbo_index].time = m_current_time;
+            m_joy |= 1 << (key_index + player * 8);
+        }
+    }
+}
+
+void SDLApplication::KeyUp(nes::InputKey key, int player)
+{
+    if (key != nes::InputKey::TurboA && key != nes::InputKey::TurboB)
+    {
+        m_joy &= ~(1 << (static_cast<int>(key) + player * 8));
+    }
+    else
+    {
+        int key_index = static_cast<int>(key != nes::InputKey::TurboA);
+        m_joy &= ~(1 << (key_index + player * 8));
+        m_turbo_keys[key_index + player * 2].enable = false;
+    }
+}
+
+void SDLApplication::TurboTick()
+{
+    for (int i = 0; i < 4; i++)
+    {
+        if (!m_turbo_keys[i].enable)
+            continue;
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(m_current_time - m_turbo_keys[i].time).count();
+        if (ms % m_turbo_time % 2 == 0)
+            m_joy |= 1 << ((i & 0x01) | ((i & 0x02) << 2));
+        else
+            m_joy &= ~(1 << ((i & 0x01) | ((i & 0x02) << 2)));
+    }
+}
+
 void SDLApplication::Run(bool &running)
 {
-    // 先这么写，之后再改
-    std::uint16_t controller = 0;
+    m_current_time = std::chrono::high_resolution_clock::now();
 
-    std::unordered_map<SDL_Keycode, int> keyboard_map;
-    keyboard_map[SDLK_KP_PERIOD] = 0; keyboard_map[SDLK_KP_0] = 1; keyboard_map[SDLK_KP_PLUS] = 2;   keyboard_map[SDLK_KP_ENTER] = 3;
-    keyboard_map[SDLK_UP] = 4;        keyboard_map[SDLK_DOWN] = 5; keyboard_map[SDLK_LEFT] = 6;      keyboard_map[SDLK_RIGHT] = 7;
-    keyboard_map[SDLK_k] = 8;         keyboard_map[SDLK_j] = 9;    keyboard_map[SDLK_SEMICOLON] = 10; keyboard_map[SDLK_RETURN] = 11;
-    keyboard_map[SDLK_w] = 12;        keyboard_map[SDLK_s] = 13;   keyboard_map[SDLK_a] = 14;        keyboard_map[SDLK_d] = 15;
+    m_keyboard_map[SDLK_k] = {nes::InputKey::A, 0};               m_keyboard_map[SDLK_j] = {nes::InputKey::B, 0};
+    m_keyboard_map[SDLK_SEMICOLON] = {nes::InputKey::Select, 0};  m_keyboard_map[SDLK_RETURN] = {nes::InputKey::Start, 0};
+    m_keyboard_map[SDLK_w] = {nes::InputKey::Up, 0};              m_keyboard_map[SDLK_s] = {nes::InputKey::Down, 0};
+    m_keyboard_map[SDLK_a] = {nes::InputKey::Left, 0};            m_keyboard_map[SDLK_d] = {nes::InputKey::Right, 0};
+    m_keyboard_map[SDLK_i] = {nes::InputKey::TurboA, 0};          m_keyboard_map[SDLK_u] = {nes::InputKey::TurboB, 0};
+    m_keyboard_map[SDLK_KP_PERIOD] = {nes::InputKey::A, 1};       m_keyboard_map[SDLK_KP_0] = {nes::InputKey::B, 1};
+    m_keyboard_map[SDLK_KP_PLUS] = {nes::InputKey::Select, 1};    m_keyboard_map[SDLK_KP_ENTER] = {nes::InputKey::Start, 1};
+    m_keyboard_map[SDLK_UP] = {nes::InputKey::Up, 1};             m_keyboard_map[SDLK_DOWN] = {nes::InputKey::Down, 1};
+    m_keyboard_map[SDLK_LEFT] = {nes::InputKey::Left, 1};         m_keyboard_map[SDLK_RIGHT] = {nes::InputKey::Right, 1};
+    m_keyboard_map[SDLK_KP_2] = {nes::InputKey::TurboA, 1};       m_keyboard_map[SDLK_KP_1] = {nes::InputKey::TurboB, 1};
 
     while (running)
     {
         SDL_Event event;
+        m_current_time = std::chrono::high_resolution_clock::now();
         while (SDL_PollEvent(&event))
         {
-            std::unordered_map<SDL_Keycode, int>::iterator key_iter;
+            std::unordered_map<SDL_Keycode, KeyInfo>::iterator key_iter;
 
             switch (event.type)
             {
@@ -59,20 +107,23 @@ void SDLApplication::Run(bool &running)
                 running = false;
                 return;
             case SDL_KEYDOWN:
-                key_iter = keyboard_map.find(event.key.keysym.sym);
-                if (key_iter != keyboard_map.end())
-                    controller |= (1 << key_iter->second);
+                key_iter = m_keyboard_map.find(event.key.keysym.sym);
+                if (key_iter != m_keyboard_map.end())
+                    KeyDown(key_iter->second.key, key_iter->second.player);
                 break;
             case SDL_KEYUP:
-                key_iter = keyboard_map.find(event.key.keysym.sym);
-                if (key_iter != keyboard_map.end())
-                    controller &= ~(1 << key_iter->second);
+                key_iter = m_keyboard_map.find(event.key.keysym.sym);
+                if (key_iter != m_keyboard_map.end())
+                    KeyUp(key_iter->second.key, key_iter->second.player);
                 break;
             default:
                 break;
             }
         }
-        m_device->ApplicationSetControllers(static_cast<std::uint8_t>(controller >> 8), static_cast<std::uint8_t>(controller));
+
+        TurboTick();
+
+        m_device->ApplicationSetControllers(static_cast<std::uint8_t>(m_joy & 0xff), static_cast<std::uint8_t>(m_joy >> 8));
         m_device->ApplicationUpdate();
         SDL_RenderClear(m_renderer);
         SDL_RenderCopy(m_renderer, m_texture, nullptr, nullptr);
