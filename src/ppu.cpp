@@ -37,13 +37,21 @@ namespace nes
 
     void PPU::StepPreRenderScanline()
     {
+        if (m_cycle == 1)
+        {
+            m_PPUSTATUS &= ~0xC0; // 清除sprite 0 hit和vertical blank标记
+        }
         if (IsRenderingEnabled())
         {
-            if (m_cycle == 1)
+            if (IsRenderingCycle())
             {
-                m_PPUSTATUS &= ~0xC0; // 清除sprite 0 hit和vertical blank标记
+                FetchingData();
+                if (m_cycle % 8 == 0)
+                    IncHorizontal();
+                if (m_cycle == 256)
+                    IncVertical();
             }
-            else if (m_cycle == 257)
+            if (m_cycle == 257)
             {
                 // v: ....A.. ...BCDEF <- t: ....A.. ...BCDEF
                 m_PPUADDR &= ~0x041f;
@@ -54,6 +62,23 @@ namespace nes
                 // v: GHIA.BC DEF..... <- t: GHIA.BC DEF.....
                 m_PPUADDR &= ~0x7be0;
                 m_PPUADDR |= m_internal_register_wt & 0x7be0;
+            }
+            else if (IsFetchingCycle())
+            {
+                if (IsShowBackgroundEnabled())
+                {
+                    FetchingData();
+                    if (m_cycle % 8 == 0)
+                    {
+                        m_fetched_attribute_table <<= 8;
+                        m_fetched_attribute_table |= m_attribute_table;
+                        m_fetched_pattern_low <<= 8;
+                        m_fetched_pattern_low |= m_pattern_low;
+                        m_fetched_pattern_high <<= 8;
+                        m_fetched_pattern_high |= m_pattern_high;
+                        IncHorizontal();
+                    }
+                }
             }
         }
         if (m_cycle >= 257 && m_cycle <= 320)
@@ -75,18 +100,6 @@ namespace nes
     {
         if (m_cycle == 0)
         {
-            // 本来这个周期不该做事的，但是我想通了
-            // 如果真按照PPU的时序走，在非渲染时会有写入数据的可能，然后CPU那边代码shi导致这边也被影响了
-            // 所以只要能保证一个scanline里IncHorizontal执行33次就行了
-            // F1赛车的模拟会有些问题
-            // 之后CPU那边时序测的没问题了再搞PPU的时序
-            if (m_fine_x_scroll != 0)
-            {
-                FetchingNametable();
-                FetchingAttribute();
-                FetchingPatternLow();
-                FetchingPatternHigh();
-            }
         }
         else if (IsRenderingCycle())
         {
@@ -95,30 +108,34 @@ namespace nes
             bool bg_transparent = false;
             bool sp_foreground = false;
 
-            if (IsShowBackgroundEnabled() && (IsShowBackgroundLeftmost8() || m_cycle > 8))
+            if (IsShowBackgroundEnabled())
             {
                 int x = (m_fine_x_scroll + m_cycle - 1) & 0x07;
 
-                if (x == 0)
-                {
-                    FetchingNametable();
-                    FetchingAttribute();
-                    FetchingPatternLow();
-                    FetchingPatternHigh();
-                }
+                FetchingData();
 
-                background_color_index = ((m_pattern_high >> (7 - x) << 1) & 0x02) | (m_pattern_low >> (7 - x) & 0x01);
-                if (background_color_index != 0)
+                if (IsShowBackgroundLeftmost8() || m_cycle > 8)
                 {
-                    background_color_index |= m_attribute_table << 2;
+                    background_color_index = ((m_fetched_pattern_high >> (15 - x) << 1) & 0x02) | (m_fetched_pattern_low >> (15 - x) & 0x01);
+                    if (background_color_index != 0)
+                    {
+                        background_color_index |= ((m_fetched_attribute_table >> 6) & 0xff);
+                    }
                 }
-                else
-                {
+                if (background_color_index == 0)
                     bg_transparent = true;
-                }
                 
                 if (x == 7)
                 {
+                    m_fetched_attribute_table <<= 8;
+                    m_fetched_pattern_low <<= 8;
+                    m_fetched_pattern_high <<= 8;
+                }
+                if (m_cycle % 8 == 0)
+                {
+                    m_fetched_attribute_table |= m_attribute_table;
+                    m_fetched_pattern_low |= m_pattern_low;
+                    m_fetched_pattern_high |= m_pattern_high;
                     IncHorizontal();
                 }
                 if (m_cycle == 256)
@@ -202,6 +219,23 @@ namespace nes
                 m_mapper_reduce_IRQ_counter();
             m_OAMADDR = 0;
         }
+        else if (IsFetchingCycle())
+        {
+            if (IsShowBackgroundEnabled())
+            {
+                FetchingData();
+                if (m_cycle % 8 == 0)
+                {
+                    m_fetched_attribute_table <<= 8;
+                    m_fetched_attribute_table |= m_attribute_table;
+                    m_fetched_pattern_low <<= 8;
+                    m_fetched_pattern_low |= m_pattern_low;
+                    m_fetched_pattern_high <<= 8;
+                    m_fetched_pattern_high |= m_pattern_high;
+                    IncHorizontal();
+                }
+            }
+        }
 
         if (m_cycle++ >= CYCLE_PER_SCANLINE)
         {
@@ -228,9 +262,10 @@ namespace nes
         if (m_scanline == 241 && m_cycle == 1)
         {
             m_PPUSTATUS |= 0x80; // 设置vertical blank标记
-            if (IsNMIEnabled())
-                m_trigger_NMI();
         }
+        // 因为存在竞争，所以延时一会触发NMI中断
+        if (m_scanline == 241 && m_cycle == 15 && (m_PPUSTATUS & 0x80) && IsNMIEnabled())
+            m_trigger_NMI();
         if (m_cycle++ >= CYCLE_PER_SCANLINE)
         {
             m_cycle = 0;
@@ -298,6 +333,27 @@ namespace nes
         m_pattern_high = PPUBusRead(pattern_address);
     }
 
+    void PPU::FetchingData()
+    {
+        switch (m_cycle % 8)
+        {
+            case 1:
+                FetchingNametable();
+                break;
+            case 3:
+                FetchingAttribute();
+                break;
+            case 5:
+                FetchingPatternLow();
+                break;
+            case 7:
+                FetchingPatternHigh();
+                break;
+            default:
+                break;
+        }
+    }
+
     void PPU::SpriteEvaluation(int scanline)
     {
         int limit = IsSpriteSize8x16() ? 16 : 8;
@@ -343,7 +399,7 @@ namespace nes
         default:
             break;
         }
-        return 0;
+        return m_open_bus;
     }
 
     void PPU::SetRegister(std::uint16_t address, std::uint8_t value)
@@ -377,6 +433,7 @@ namespace nes
         default:
             break;
         }
+        m_open_bus = value;
     }
 
     void PPU::SetPPUCTRL(std::uint8_t value)
@@ -459,10 +516,17 @@ namespace nes
 
     std::uint8_t PPU::GetPPUDATA()
     {
-        std::uint8_t res = m_PPUDATA_buffer;
-        m_PPUDATA_buffer = PPUBusRead(m_PPUADDR);
+        std::uint8_t res;
         if (m_PPUADDR >= 0x3f00)
+        {
+            res = PPUBusRead(m_PPUADDR);
+            m_PPUDATA_buffer = PPUBusRead(0x2000 | (m_PPUADDR & 0x0fff));
+        }
+        else
+        {
             res = m_PPUDATA_buffer;
+            m_PPUDATA_buffer = PPUBusRead(m_PPUADDR);
+        }
         m_PPUADDR = (m_PPUADDR + GetAddressIncrement()) & 0x3fff;
         return res;
     }

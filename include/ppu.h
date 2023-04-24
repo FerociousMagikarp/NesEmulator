@@ -57,6 +57,7 @@ namespace nes
         void FetchingAttribute();
         void FetchingPatternLow();
         void FetchingPatternHigh();
+        void FetchingData();
 
         void SpriteEvaluation(int scanline);
 
@@ -106,6 +107,8 @@ namespace nes
     private:
         std::unique_ptr<std::uint8_t[]> m_VRAM = nullptr;
 
+        std::uint8_t m_open_bus = 0;
+
         std::uint8_t m_PPUCTRL = 0;
         std::uint8_t m_PPUMASK = 0;
         std::uint8_t m_PPUSTATUS = 0;
@@ -126,6 +129,10 @@ namespace nes
         std::uint8_t m_attribute_table = 0;
         std::uint8_t m_pattern_low = 0;
         std::uint8_t m_pattern_high = 0;
+
+        std::uint16_t m_fetched_attribute_table = 0;
+        std::uint16_t m_fetched_pattern_low = 0;
+        std::uint16_t m_fetched_pattern_high = 0;
 
         std::array<std::uint8_t, 64 * 4> m_primary_OAM;
         // 单纯存一下m_primary_OAM的坐标
