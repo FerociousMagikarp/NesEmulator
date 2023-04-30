@@ -42,14 +42,14 @@ class SDLApplication
         };
         std::unordered_map<SDL_Keycode, KeyInfo> m_keyboard_map;
         std::uint32_t m_joy = 0;
-        std::uint32_t m_turbo_time = 30;
+        std::uint32_t m_turbo_time = 16;
 
         struct TurboKey
         {
             nes::InputKey key;
             int player;
             bool enable = false;
-            std::chrono::system_clock::time_point time;
+            std::chrono::steady_clock::time_point time;
 
             TurboKey(nes::InputKey key, int player) : key(key), player(player) {}
         };
@@ -60,5 +60,5 @@ class SDLApplication
             TurboKey(nes::InputKey::TurboA, 1), TurboKey(nes::InputKey::TurboB, 1)
         };
 
-        std::chrono::system_clock::time_point m_current_time;
+        std::chrono::steady_clock::time_point m_current_time;
 };

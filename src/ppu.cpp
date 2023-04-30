@@ -40,12 +40,12 @@ namespace nes
         if (m_cycle == 1)
         {
             m_PPUSTATUS &= ~0xC0; // 清除sprite 0 hit和vertical blank标记
+            m_has_trigger_NMI = false;
         }
         if (IsRenderingEnabled())
         {
             if (IsRenderingCycle())
             {
-                FetchingData();
                 if (m_cycle % 8 == 0)
                     IncHorizontal();
                 if (m_cycle == 256)
@@ -65,19 +65,16 @@ namespace nes
             }
             else if (IsFetchingCycle())
             {
-                if (IsShowBackgroundEnabled())
+                FetchingData();
+                if (m_cycle % 8 == 0)
                 {
-                    FetchingData();
-                    if (m_cycle % 8 == 0)
-                    {
-                        m_fetched_attribute_table <<= 8;
-                        m_fetched_attribute_table |= m_attribute_table;
-                        m_fetched_pattern_low <<= 8;
-                        m_fetched_pattern_low |= m_pattern_low;
-                        m_fetched_pattern_high <<= 8;
-                        m_fetched_pattern_high |= m_pattern_high;
-                        IncHorizontal();
-                    }
+                    m_fetched_attribute_table <<= 8;
+                    m_fetched_attribute_table |= m_attribute_table;
+                    m_fetched_pattern_low <<= 8;
+                    m_fetched_pattern_low |= m_pattern_low;
+                    m_fetched_pattern_high <<= 8;
+                    m_fetched_pattern_high |= m_pattern_high;
+                    IncHorizontal();
                 }
             }
         }
@@ -108,7 +105,7 @@ namespace nes
             bool bg_transparent = false;
             bool sp_foreground = false;
 
-            if (IsShowBackgroundEnabled())
+            if (IsRenderingEnabled())
             {
                 int x = (m_fine_x_scroll + m_cycle - 1) & 0x07;
 
@@ -119,10 +116,10 @@ namespace nes
                     background_color_index = ((m_fetched_pattern_high >> (15 - x) << 1) & 0x02) | (m_fetched_pattern_low >> (15 - x) & 0x01);
                     if (background_color_index != 0)
                     {
-                        background_color_index |= ((m_fetched_attribute_table >> 6) & 0xff);
+                        background_color_index |= ((m_fetched_attribute_table >> 6) & 0x0c);
                     }
                 }
-                if (background_color_index == 0)
+                if (background_color_index == 0 || !IsShowBackgroundEnabled())
                     bg_transparent = true;
                 
                 if (x == 7)
@@ -181,7 +178,7 @@ namespace nes
 
                         color |= ((attribute & 0x03) << 2) | 0x10;
 
-                        if (!IsSprite0Hit() && IsShowBackgroundEnabled() && i == 0 && !bg_transparent)
+                        if (!IsSprite0Hit() && IsBothBgAndSpEnabled() && i == 0 && !bg_transparent)
                         {
                             m_PPUSTATUS |= 0x40;
                         }
@@ -221,7 +218,7 @@ namespace nes
         }
         else if (IsFetchingCycle())
         {
-            if (IsShowBackgroundEnabled())
+            if (IsRenderingEnabled())
             {
                 FetchingData();
                 if (m_cycle % 8 == 0)
@@ -259,13 +256,17 @@ namespace nes
 
     void PPU::StepVerticalBlankingLines()
     {
-        if (m_scanline == 241 && m_cycle == 1)
+        if (m_scanline == 241 && m_cycle == 1 && !m_NMI_conflict)
         {
             m_PPUSTATUS |= 0x80; // 设置vertical blank标记
         }
-        // 因为存在竞争，所以延时一会触发NMI中断
-        if (m_scanline == 241 && m_cycle == 15 && (m_PPUSTATUS & 0x80) && IsNMIEnabled())
+        m_NMI_conflict = false;
+        // 因为存在竞争，所以延时一会触发NMI中断，但是延这么多能通过cpu_interrupt的测试rom，我也不知道为啥
+        if (m_scanline == 241 && m_cycle == 15 && (m_PPUSTATUS & 0x80) && IsNMIEnabled() && !m_has_trigger_NMI)
+        {
             m_trigger_NMI();
+            m_has_trigger_NMI = true;
+        }
         if (m_cycle++ >= CYCLE_PER_SCANLINE)
         {
             m_cycle = 0;
@@ -438,7 +439,13 @@ namespace nes
 
     void PPU::SetPPUCTRL(std::uint8_t value)
     {
+        bool last_NMI_enable = IsNMIEnabled();
         m_PPUCTRL = value;
+        if (IsNMIEnabled() && (m_PPUSTATUS & 0x80) && (!m_has_trigger_NMI || !last_NMI_enable))
+        {
+            m_trigger_NMI();
+            m_has_trigger_NMI = true;
+        }
         m_internal_register_wt &= ~0x0c00;
         m_internal_register_wt |= (value & 0x3) << 10;
     }
@@ -448,6 +455,10 @@ namespace nes
         m_internal_register_wt &= ~0x8000;
         std::uint8_t res = m_PPUSTATUS;
         m_PPUSTATUS &= ~0x80;
+
+        if ((m_scanline == 240 && m_cycle == CYCLE_PER_SCANLINE) || (m_scanline == 241 && m_cycle <= 1))
+            m_NMI_conflict = true;
+
         return res;
     }
 

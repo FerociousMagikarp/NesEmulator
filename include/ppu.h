@@ -134,6 +134,9 @@ namespace nes
         std::uint16_t m_fetched_pattern_low = 0;
         std::uint16_t m_fetched_pattern_high = 0;
 
+        bool m_NMI_conflict = false;
+        bool m_has_trigger_NMI = false;
+
         std::array<std::uint8_t, 64 * 4> m_primary_OAM;
         // 单纯存一下m_primary_OAM的坐标
         std::vector<int> m_secondary_OAM;

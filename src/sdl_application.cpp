@@ -2,6 +2,7 @@
 #include "SDL.h"
 #include "def.h"
 #include "virtual_device.h"
+#include <chrono>
 #include <cstdint>
 
 SDLApplication::~SDLApplication()
@@ -80,7 +81,7 @@ void SDLApplication::TurboTick()
 
 void SDLApplication::Run(bool &running)
 {
-    m_current_time = std::chrono::high_resolution_clock::now();
+    m_current_time = std::chrono::steady_clock::now();
 
     m_keyboard_map[SDLK_k] = {nes::InputKey::A, 0};               m_keyboard_map[SDLK_j] = {nes::InputKey::B, 0};
     m_keyboard_map[SDLK_SEMICOLON] = {nes::InputKey::Select, 0};  m_keyboard_map[SDLK_RETURN] = {nes::InputKey::Start, 0};
@@ -96,7 +97,7 @@ void SDLApplication::Run(bool &running)
     while (running)
     {
         SDL_Event event;
-        m_current_time = std::chrono::high_resolution_clock::now();
+        m_current_time = std::chrono::steady_clock::now();
         while (SDL_PollEvent(&event))
         {
             std::unordered_map<SDL_Keycode, KeyInfo>::iterator key_iter;
