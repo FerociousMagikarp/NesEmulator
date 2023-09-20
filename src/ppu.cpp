@@ -7,7 +7,7 @@ namespace nes
     constexpr int SCANLINE_PER_FRAME = 262;
     constexpr int CYCLE_PER_SCANLINE = 340;
 
-    PPU::PPU() : m_VRAM(std::make_unique<std::uint8_t[]>(0x0800))
+    PPU::PPU() : m_VRAM(std::make_unique<std::uint8_t[]>(0x0800)), m_step_coro(StepCoro())
     {
         m_secondary_OAM.reserve(8);
     }
@@ -18,225 +18,283 @@ namespace nes
     }
 
     void PPU::Reset()
-    {   
-        m_scanline = 261;
-        m_cycle = 0;
+    {
+        m_step_coro = StepCoro();
     }
 
     void PPU::Step()
     {
-        if (m_scanline == 261) // PreRender
-            StepPreRenderScanline();
-        else if (m_scanline >= 0 && m_scanline <= 239) // Visible
-            StepVisibleScanlines();
-        else if (m_scanline == 240) // PostRender
-            StepPostRenderScanline();
-        else // m_scanline >= 241 && m_scanline <= 260, VerticalBlanking
-            StepVerticalBlankingLines();
+        // if (m_scanline == 261) // PreRender
+        //     StepPreRenderScanline();
+        // else if (m_scanline >= 0 && m_scanline <= 239) // Visible
+        //     StepVisibleScanlines();
+        // else if (m_scanline == 240) // PostRender
+        //     StepPostRenderScanline();
+        // else // m_scanline >= 241 && m_scanline <= 260, VerticalBlanking
+        //     StepVerticalBlankingLines();
+        m_step_coro.m_handle.resume();
     }
 
-    void PPU::StepPreRenderScanline()
+    PPUCycleCoro PPU::StepCoro()
     {
+        while (true)
+        {
+            // =========================================
+            // PreRender (scanline == 261)
+            // =========================================
+            {
+                m_scanline_type = PPUScanlineType::PreRender;
+                // cycle == 0
+                co_await std::suspend_always{};
+
+                // cycle == 1
+                m_PPUSTATUS &= ~0xC0; // 清除sprite 0 hit和vertical blank标记
+                m_has_trigger_NMI = false;
+                co_await std::suspend_always{};
+
+                // cycle -> [2, 339]
+                for (int cycle = 2; cycle <= 339; cycle++)
+                {
+                    if (IsRenderingEnabled() && cycle >= 280 && cycle <= 304)
+                    {
+                        // v: GHIA.BC DEF..... <- t: GHIA.BC DEF.....
+                        m_PPUADDR &= ~0x7be0;
+                        m_PPUADDR |= m_internal_register_wt & 0x7be0;
+                    }
+                    co_await std::suspend_always{};
+                }
+
+                // 有没有cycle == 340??
+                // 奇数帧的时候会少一个cycle，直接跳到下一个渲染，偶数帧就还得有个340
+                if (!IsRenderingEnabled() || m_frame % 2 == 0)
+                {
+                    co_await std::suspend_always{};
+                }
+
+                m_device->StartPPURender();
+            }
+
+            // =========================================
+            // Visible (scanline -> [0, 239])
+            // =========================================
+            {
+                m_scanline_type = PPUScanlineType::Visible;
+
+                for (int scanline = 0; scanline <= 239; scanline++)
+                {
+                    // cycle == 0
+                    co_await std::suspend_always{};
+
+                    // cycle -> [1, 256]
+                    for (int cycle = 1; cycle <= 256; cycle++)
+                    {
+                        StepExecVisibleRendering(scanline, cycle);
+                        co_await std::suspend_always{};
+                    }
+
+                    // cycle == 257
+                    if (IsRenderingEnabled())
+                    {
+                        // v: ....A.. ...BCDEF <- t: ....A.. ...BCDEF
+                        m_PPUADDR &= ~0x041f;
+                        m_PPUADDR |= m_internal_register_wt & 0x041f;
+                    }
+                    m_OAMADDR = 0;
+                    co_await std::suspend_always{};
+
+                    // cycle -> [258, 320]
+                    for (int cycle = 258; cycle <= 320; cycle++)
+                    {
+                        if (cycle == 260 && IsBothBgAndSpEnabled())
+                            m_mapper_reduce_IRQ_counter();
+                        m_OAMADDR = 0;
+                        co_await std::suspend_always{};
+                    }
+
+                    // cycle -> [321, 336]
+                    for (int cycle = 321; cycle <= 336; cycle++)
+                    {
+                        if (IsRenderingEnabled())
+                        {
+                            FetchingData(cycle);
+                            if (cycle % 8 == 0)
+                            {
+                                m_fetched_attribute_table <<= 8;
+                                m_fetched_attribute_table |= m_attribute_table;
+                                m_fetched_pattern_low <<= 8;
+                                m_fetched_pattern_low |= m_pattern_low;
+                                m_fetched_pattern_high <<= 8;
+                                m_fetched_pattern_high |= m_pattern_high;
+                                IncHorizontal();
+                            }
+                        }
+                        co_await std::suspend_always{};
+                    }
+
+                    // cycle -> [337, 340]
+                    for (int cycle = 337; cycle <= 340; cycle++)
+                        co_await std::suspend_always{};
+                }
+            }
+
+            // =========================================
+            // PostRender (scanline == 240)
+            // =========================================
+            {
+                m_scanline_type = PPUScanlineType::PostRender;
+
+                m_device->EndPPURender();
+                for (int cycle = 0; cycle <= 339; cycle++)
+                    co_await std::suspend_always{};
+                m_may_cause_NMI_conflict = true;
+                co_await std::suspend_always{};
+            }
+
+            // =========================================
+            // VerticalBlanking (scanline -> [241, 260])
+            // =========================================
+            {
+                m_scanline_type = PPUScanlineType::VerticalBlanking;
+
+                // scanline == 241 事太多，单独拿出来
+                // cycle == 0
+                m_NMI_conflict = false;
+                co_await std::suspend_always{};
+
+                // cycle == 1
+                if (!m_NMI_conflict)
+                    m_PPUSTATUS |= 0x80; // 设置vertical blank标记
+                co_await std::suspend_always{};
+
+                m_may_cause_NMI_conflict = false;
+                // cycle -> [2, 340]
+                for (int cycle = 2; cycle <= 340; cycle++)
+                {
+                    if (cycle == 15 && (m_PPUSTATUS & 0x80) && IsNMIEnabled() && !m_has_trigger_NMI)
+                    {
+                        m_trigger_NMI();
+                        m_has_trigger_NMI = true;
+                    }
+                    co_await std::suspend_always{};
+                }
+
+                // 剩余scanline和cycle
+                for (int scanline = 242; scanline <= 260; scanline++)
+                {
+                    for (int cycle = 0; cycle <= 340; cycle++)
+                        co_await std::suspend_always{};
+                }
+            }
+
+            m_frame++;
+        }
+    }
+
+    void PPU::StepExecVisibleRendering(int scanline, int cycle)
+    {
+        std::uint8_t background_color_index = 0;
+        std::uint8_t sprite_color_index = 0;
+        bool bg_transparent = false;
+        bool sp_foreground = false;
+
         if (IsRenderingEnabled())
         {
-            if (m_cycle == 1)
-            {
-                m_PPUSTATUS &= ~0xC0; // 清除sprite 0 hit和vertical blank标记
-            }
-            else if (m_cycle == 257)
-            {
-                // v: ....A.. ...BCDEF <- t: ....A.. ...BCDEF
-                m_PPUADDR &= ~0x041f;
-                m_PPUADDR |= m_internal_register_wt & 0x041f;
-            }
-            else if (m_cycle >= 280 && m_cycle <= 304)
-            {
-                // v: GHIA.BC DEF..... <- t: GHIA.BC DEF.....
-                m_PPUADDR &= ~0x7be0;
-                m_PPUADDR |= m_internal_register_wt & 0x7be0;
-            }
-        }
-        if (m_cycle >= 257 && m_cycle <= 320)
-        {
-            m_OAMADDR = 0;
-            if (m_cycle == 260 && IsBothBgAndSpEnabled())
-                m_mapper_reduce_IRQ_counter();
-        }
-        // 奇数帧的时候会少一个cycle，直接跳到下一个渲染
-        if (m_cycle++ >= CYCLE_PER_SCANLINE - ((m_frame & 1) && IsRenderingEnabled()))
-        {
-            m_cycle = 0;
-            m_scanline = 0;
-            m_device->StartPPURender(); // 趁这个时候把锁加上
-        }
-    }
+            int x = (m_fine_x_scroll + cycle - 1) & 0x07;
 
-    void PPU::StepVisibleScanlines()
-    {
-        if (m_cycle == 0)
-        {
-            // 本来这个周期不该做事的，但是我想通了
-            // 如果真按照PPU的时序走，在非渲染时会有写入数据的可能，然后CPU那边代码shi导致这边也被影响了
-            // 所以只要能保证一个scanline里IncHorizontal执行33次就行了
-            // F1赛车的模拟会有些问题
-            // 之后CPU那边时序测的没问题了再搞PPU的时序
-            if (m_fine_x_scroll != 0)
+            FetchingData(cycle);
+
+            if (IsShowBackgroundLeftmost8() || cycle > 8)
             {
-                FetchingNametable();
-                FetchingAttribute();
-                FetchingPatternLow();
-                FetchingPatternHigh();
-            }
-        }
-        else if (IsRenderingCycle())
-        {
-            std::uint8_t background_color_index = 0;
-            std::uint8_t sprite_color_index = 0;
-            bool bg_transparent = false;
-            bool sp_foreground = false;
-
-            if (IsShowBackgroundEnabled() && (IsShowBackgroundLeftmost8() || m_cycle > 8))
-            {
-                int x = (m_fine_x_scroll + m_cycle - 1) & 0x07;
-
-                if (x == 0)
-                {
-                    FetchingNametable();
-                    FetchingAttribute();
-                    FetchingPatternLow();
-                    FetchingPatternHigh();
-                }
-
-                background_color_index = ((m_pattern_high >> (7 - x) << 1) & 0x02) | (m_pattern_low >> (7 - x) & 0x01);
+                background_color_index = ((m_fetched_pattern_high >> (15 - x) << 1) & 0x02) | (m_fetched_pattern_low >> (15 - x) & 0x01);
                 if (background_color_index != 0)
                 {
-                    background_color_index |= m_attribute_table << 2;
-                }
-                else
-                {
-                    bg_transparent = true;
-                }
-                
-                if (x == 7)
-                {
-                    IncHorizontal();
-                }
-                if (m_cycle == 256)
-                {
-                    IncVertical();
+                    background_color_index |= ((m_fetched_attribute_table >> 6) & 0x0c);
                 }
             }
-            if (IsShowSpriteEnabled() && (IsShowSpriteLeftmost8() || m_cycle > 8))
-            {
-                for (int i : m_secondary_OAM)
-                {
-                    int x = m_primary_OAM[(i << 2) | 3];
-                    int diff_x = m_cycle - x - 1;
-                    if (diff_x >= 0 && diff_x < 8)
-                    {
-                        int y = m_primary_OAM[(i << 2) | 0] + 1;
-                        int index = m_primary_OAM[(i << 2) | 1];
-                        int attribute = m_primary_OAM[(i << 2) | 2];
-
-                        std::uint16_t pattern_addr = 0;
-                        int diff_y = m_scanline - y;
-
-                        if ((attribute & 0x40) == 0)
-                            diff_x = 7 - diff_x;
-                        if ((attribute & 0x80) != 0)
-                            diff_y = (IsSpriteSize8x16() ? 15 : 7) - diff_y;
-
-                        if (IsSpriteSize8x16())
-                        {
-                            diff_y = (diff_y & 0x07) | ((diff_y & 0x08) << 1);
-                            pattern_addr = ((index >> 1) << 5) + diff_y;
-                            pattern_addr |= (index & 0x01) << 12;
-                        }
-                        else
-                        {
-                            pattern_addr = ((index << 4) | diff_y) | GetSpritePatternTableAddress();
-                        }
-
-                        std::uint8_t color = (PPUBusRead(pattern_addr) >> diff_x) & 0x01;
-                        color |= ((PPUBusRead(pattern_addr + 8) >> diff_x) & 0x01) << 1;
-                        if (color == 0)
-                            continue;
-
-                        color |= ((attribute & 0x03) << 2) | 0x10;
-
-                        if (!IsSprite0Hit() && IsShowBackgroundEnabled() && i == 0 && !bg_transparent)
-                        {
-                            m_PPUSTATUS |= 0x40;
-                        }
-                        sp_foreground = (attribute & 0x20) == 0;
-                        sprite_color_index = color;
-
-                        break;
-                    }
-                }
-
-                if (m_cycle == 256)
-                {
-                    // 本来是65~256cycle去做这个事，省了，就在最后一周期搞了，以后有问题以后再说
-                    SpriteEvaluation(m_scanline + 1);
-                }
-            }
-
-            std::uint8_t color_index = 0;
-            if (bg_transparent || sp_foreground)
-                color_index = sprite_color_index;
-            else
-                color_index = background_color_index;
+            if (background_color_index == 0 || !IsShowBackgroundEnabled())
+                bg_transparent = true;
             
-            m_device->SetPixel(m_cycle - 1, m_scanline, GetPalette(color_index & 0x1f) & 0x3f);
-        }
-        else if (m_cycle >= 257 && m_cycle <= 320)
-        {
-            if (m_cycle == 257 && IsRenderingEnabled())
+            if (x == 7)
             {
-                // v: ....A.. ...BCDEF <- t: ....A.. ...BCDEF
-                m_PPUADDR &= ~0x041f;
-                m_PPUADDR |= m_internal_register_wt & 0x041f;
+                m_fetched_attribute_table <<= 8;
+                m_fetched_pattern_low <<= 8;
+                m_fetched_pattern_high <<= 8;
             }
-            if (m_cycle == 260 && IsBothBgAndSpEnabled())
-                m_mapper_reduce_IRQ_counter();
-            m_OAMADDR = 0;
+            if (cycle % 8 == 0)
+            {
+                m_fetched_attribute_table |= m_attribute_table;
+                m_fetched_pattern_low |= m_pattern_low;
+                m_fetched_pattern_high |= m_pattern_high;
+                IncHorizontal();
+            }
+            if (cycle == 256)
+            {
+                IncVertical();
+            }
+        }
+        if (IsShowSpriteEnabled() && (IsShowSpriteLeftmost8() || cycle > 8))
+        {
+            for (int i : m_secondary_OAM)
+            {
+                int x = m_primary_OAM[(i << 2) | 3];
+                int diff_x = cycle - x - 1;
+                if (diff_x >= 0 && diff_x < 8)
+                {
+                    int y = m_primary_OAM[(i << 2) | 0] + 1;
+                    int index = m_primary_OAM[(i << 2) | 1];
+                    int attribute = m_primary_OAM[(i << 2) | 2];
+
+                    std::uint16_t pattern_addr = 0;
+                    int diff_y = scanline - y;
+
+                    if ((attribute & 0x40) == 0)
+                        diff_x = 7 - diff_x;
+                    if ((attribute & 0x80) != 0)
+                        diff_y = (IsSpriteSize8x16() ? 15 : 7) - diff_y;
+
+                    if (IsSpriteSize8x16())
+                    {
+                        diff_y = (diff_y & 0x07) | ((diff_y & 0x08) << 1);
+                        pattern_addr = ((index >> 1) << 5) + diff_y;
+                        pattern_addr |= (index & 0x01) << 12;
+                    }
+                    else
+                    {
+                        pattern_addr = ((index << 4) | diff_y) | GetSpritePatternTableAddress();
+                    }
+
+                    std::uint8_t color = (PPUBusRead(pattern_addr) >> diff_x) & 0x01;
+                    color |= ((PPUBusRead(pattern_addr + 8) >> diff_x) & 0x01) << 1;
+                    if (color == 0)
+                        continue;
+
+                    color |= ((attribute & 0x03) << 2) | 0x10;
+
+                    if (!IsSprite0Hit() && IsBothBgAndSpEnabled() && i == 0 && !bg_transparent)
+                    {
+                        m_PPUSTATUS |= 0x40;
+                    }
+                    sp_foreground = (attribute & 0x20) == 0;
+                    sprite_color_index = color;
+
+                    break;
+                }
+            }
+
+            if (cycle == 256)
+            {
+                // 本来是65~256cycle去做这个事，省了，就在最后一周期搞了，以后有问题以后再说
+                SpriteEvaluation(scanline + 1);
+            }
         }
 
-        if (m_cycle++ >= CYCLE_PER_SCANLINE)
-        {
-            m_cycle = 0;
-            ++m_scanline;
-        }
-    }
-
-    void PPU::StepPostRenderScanline()
-    {
-        if (m_cycle == 0)
-        {
-            m_device->EndPPURender();
-        }
-        if (m_cycle++ >= CYCLE_PER_SCANLINE)
-        {
-            m_cycle = 0;
-            ++m_scanline;
-        }
-    }
-
-    void PPU::StepVerticalBlankingLines()
-    {
-        if (m_scanline == 241 && m_cycle == 1)
-        {
-            m_PPUSTATUS |= 0x80; // 设置vertical blank标记
-            if (IsNMIEnabled())
-                m_trigger_NMI();
-        }
-        if (m_cycle++ >= CYCLE_PER_SCANLINE)
-        {
-            m_cycle = 0;
-            if (++m_scanline > 260)
-                ++m_frame;
-        }
+        std::uint8_t color_index = 0;
+        if (bg_transparent || sp_foreground)
+            color_index = sprite_color_index;
+        else
+            color_index = background_color_index;
+        
+        m_device->SetPixel(cycle - 1, scanline, GetPalette(color_index & 0x1f) & 0x3f);
     }
 
     void PPU::IncHorizontal()
@@ -298,6 +356,27 @@ namespace nes
         m_pattern_high = PPUBusRead(pattern_address);
     }
 
+    void PPU::FetchingData(int cycle)
+    {
+        switch (cycle % 8)
+        {
+            case 1:
+                FetchingNametable();
+                break;
+            case 3:
+                FetchingAttribute();
+                break;
+            case 5:
+                FetchingPatternLow();
+                break;
+            case 7:
+                FetchingPatternHigh();
+                break;
+            default:
+                break;
+        }
+    }
+
     void PPU::SpriteEvaluation(int scanline)
     {
         int limit = IsSpriteSize8x16() ? 16 : 8;
@@ -343,7 +422,7 @@ namespace nes
         default:
             break;
         }
-        return 0;
+        return m_open_bus;
     }
 
     void PPU::SetRegister(std::uint16_t address, std::uint8_t value)
@@ -377,11 +456,18 @@ namespace nes
         default:
             break;
         }
+        m_open_bus = value;
     }
 
     void PPU::SetPPUCTRL(std::uint8_t value)
     {
+        bool last_NMI_enable = IsNMIEnabled();
         m_PPUCTRL = value;
+        if (IsNMIEnabled() && (m_PPUSTATUS & 0x80) && (!m_has_trigger_NMI || !last_NMI_enable))
+        {
+            m_trigger_NMI();
+            m_has_trigger_NMI = true;
+        }
         m_internal_register_wt &= ~0x0c00;
         m_internal_register_wt |= (value & 0x3) << 10;
     }
@@ -391,6 +477,10 @@ namespace nes
         m_internal_register_wt &= ~0x8000;
         std::uint8_t res = m_PPUSTATUS;
         m_PPUSTATUS &= ~0x80;
+
+        if (m_may_cause_NMI_conflict)
+            m_NMI_conflict = true;
+
         return res;
     }
 
@@ -401,14 +491,14 @@ namespace nes
 
     void PPU::SetOAMData(std::uint8_t value)
     {
-        if ((m_scanline >= 240 && m_scanline <= 260) || !IsRenderingEnabled())
+        if (m_scanline_type == PPUScanlineType::PostRender || m_scanline_type == PPUScanlineType::VerticalBlanking || !IsRenderingEnabled())
             m_primary_OAM[m_OAMADDR] = value;
         ++m_OAMADDR;
     }
 
     std::uint8_t PPU::GetOAMData() const
     {
-        if (m_scanline >= 241 && m_scanline <= 260)
+        if (m_scanline_type == PPUScanlineType::PostRender || m_scanline_type == PPUScanlineType::VerticalBlanking)
             return m_primary_OAM[m_OAMADDR];
         return 0xff;
     }
@@ -459,10 +549,17 @@ namespace nes
 
     std::uint8_t PPU::GetPPUDATA()
     {
-        std::uint8_t res = m_PPUDATA_buffer;
-        m_PPUDATA_buffer = PPUBusRead(m_PPUADDR);
+        std::uint8_t res;
         if (m_PPUADDR >= 0x3f00)
+        {
+            res = PPUBusRead(m_PPUADDR);
+            m_PPUDATA_buffer = PPUBusRead(0x2000 | (m_PPUADDR & 0x0fff));
+        }
+        else
+        {
             res = m_PPUDATA_buffer;
+            m_PPUDATA_buffer = PPUBusRead(m_PPUADDR);
+        }
         m_PPUADDR = (m_PPUADDR + GetAddressIncrement()) & 0x3fff;
         return res;
     }

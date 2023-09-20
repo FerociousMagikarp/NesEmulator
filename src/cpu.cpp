@@ -35,11 +35,20 @@ namespace nes
         ++m_cycles;
         if (m_skip_cycles > 0)
         {
+            // 虽然Wiki上说前4个周期才会抢，但是我也不知道，这个2能通过测试rom
+            if (m_is_executing_interrupt && m_skip_cycles >= 2 
+                && (m_executing_interrupt_type == CPU6502InterruptType::BRK || m_executing_interrupt_type == CPU6502InterruptType::IRQ)
+                && m_current_interrupt & (1 << static_cast<int>(CPU6502InterruptType::NMI)))
+            {
+                // 如果这种情况CPU会做错误处理
+                m_PC = ReadAddress(NMI_VECTOR);
+            }
             --m_skip_cycles;
             return;
         }
+        
         // 执行中断
-        if (m_current_interrupt != 0)
+        if (m_current_interrupt != 0 && !m_is_executing_interrupt)
         {
             if (m_current_interrupt & (1 << static_cast<int>(CPU6502InterruptType::NMI)))
             {
@@ -50,12 +59,18 @@ namespace nes
             }
             else if (m_current_interrupt & (1 << static_cast<int>(CPU6502InterruptType::IRQ)))
             {
-                InterruptExecute(CPU6502InterruptType::IRQ);
-                m_current_interrupt = 0;
-                --m_skip_cycles; // 本周期已经执行过了，所以-1
-                return;
+                if (!GetI())
+                {
+                    InterruptExecute(CPU6502InterruptType::IRQ);
+                    m_current_interrupt = 0;
+                    --m_skip_cycles; // 本周期已经执行过了，所以-1
+                    return;
+                }
             }
         }
+        // 这个中断之后总是要执行一条指令的
+        m_is_executing_interrupt = false;
+
         // 读取指令
         std::uint8_t op_code = m_main_bus_read(m_PC++);
         // CPU6502Disassembly::GetInstance().ShowCPUInfo(op_code);
@@ -80,8 +95,8 @@ namespace nes
 
     void CPU6502::InterruptExecute(CPU6502InterruptType type)
     {
-        if (GetI() && type == CPU6502InterruptType::IRQ)
-            return;
+        m_is_executing_interrupt = true;
+        m_executing_interrupt_type = type;
         if (type == CPU6502InterruptType::BRK)
             m_PC++;
         PushStack(static_cast<std::uint8_t>(m_PC >> 8));

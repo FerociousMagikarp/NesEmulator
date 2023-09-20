@@ -3,12 +3,18 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <variant>
 
 namespace nes
 {
     class NesEmulator;
     class VirtualDevice;
 }
+
+enum class CommandOption
+{
+    Scale,
+};
 
 class CommandLine
 {
@@ -30,5 +36,7 @@ private:
 
     std::string m_error = "";
     std::string m_nes_path = "";
-    std::unordered_map<std::string, std::string> m_commands;
+
+    using CommandParamType = std::variant<int, std::string>;
+    std::unordered_map<CommandOption, CommandParamType> m_commands;
 };

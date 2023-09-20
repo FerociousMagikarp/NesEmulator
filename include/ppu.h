@@ -6,6 +6,7 @@
 #include <functional>
 #include <memory>
 #include <vector>
+#include <coroutine>
 #include "def.h"
 
 namespace nes
@@ -13,6 +14,35 @@ namespace nes
     class Cartridge;
     class Device;
 
+    // PPU协程返回用
+    struct PPUCycleCoro
+    {
+        struct promise_type
+        {
+            auto get_return_object() { return std::coroutine_handle<promise_type>::from_promise(*this); }
+            auto initial_suspend() noexcept { return std::suspend_always{}; }
+            auto final_suspend() noexcept { return std::suspend_always{}; }
+            void return_void() { }
+            void unhandled_exception() {}
+        };
+
+        PPUCycleCoro(std::coroutine_handle<promise_type> handle) : m_handle(handle) {}
+        PPUCycleCoro(const PPUCycleCoro&) = delete;
+        PPUCycleCoro& operator= (const PPUCycleCoro&) = delete;
+        PPUCycleCoro(PPUCycleCoro&& other) : m_handle(other.m_handle) { other.m_handle = nullptr; }
+        PPUCycleCoro& operator= (PPUCycleCoro&& other) { m_handle = other.m_handle; other.m_handle = nullptr; return *this; }
+        ~PPUCycleCoro() { if (m_handle) m_handle.destroy(); }
+
+        std::coroutine_handle<promise_type> m_handle;
+    };
+
+    enum class PPUScanlineType
+    {
+        PreRender,
+        Visible,
+        PostRender,
+        VerticalBlanking
+    };
 
     class PPU
     {
@@ -42,13 +72,8 @@ namespace nes
 
         std::uint16_t GetVRAMAddress(std::uint16_t address);
 
-        inline bool IsRenderingCycle() const { return m_cycle >= 1 && m_cycle <= 256; }
-        inline bool IsFetchingCycle() const { return m_cycle >= 321 && m_cycle <= 336; }
-
-        void StepPreRenderScanline();
-        void StepVisibleScanlines();
-        void StepPostRenderScanline();
-        void StepVerticalBlankingLines();
+        PPUCycleCoro StepCoro();
+        void StepExecVisibleRendering(int scanline, int cycle);
 
         void IncHorizontal();
         void IncVertical();
@@ -57,6 +82,7 @@ namespace nes
         void FetchingAttribute();
         void FetchingPatternLow();
         void FetchingPatternHigh();
+        void FetchingData(int cycle);
 
         void SpriteEvaluation(int scanline);
 
@@ -106,6 +132,8 @@ namespace nes
     private:
         std::unique_ptr<std::uint8_t[]> m_VRAM = nullptr;
 
+        std::uint8_t m_open_bus = 0;
+
         std::uint8_t m_PPUCTRL = 0;
         std::uint8_t m_PPUMASK = 0;
         std::uint8_t m_PPUSTATUS = 0;
@@ -127,12 +155,21 @@ namespace nes
         std::uint8_t m_pattern_low = 0;
         std::uint8_t m_pattern_high = 0;
 
+        std::uint16_t m_fetched_attribute_table = 0;
+        std::uint16_t m_fetched_pattern_low = 0;
+        std::uint16_t m_fetched_pattern_high = 0;
+
+        bool m_NMI_conflict = false;
+        bool m_may_cause_NMI_conflict = false;
+        bool m_has_trigger_NMI = false;
+
+        PPUScanlineType m_scanline_type = PPUScanlineType::PreRender;
+
         std::array<std::uint8_t, 64 * 4> m_primary_OAM;
         // 单纯存一下m_primary_OAM的坐标
         std::vector<int> m_secondary_OAM;
 
-        int m_scanline = 0;
-        int m_cycle = 0;
+        PPUCycleCoro m_step_coro;
         unsigned int m_frame = 0;
 
         MirroringType m_mirror_type = MirroringType::Horizontal;

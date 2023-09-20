@@ -184,6 +184,11 @@ namespace nes
         std::uint16_t m_skip_cycles = 0;
         // 跳页加周期的指令是否跳页了
         bool m_cross_page = false;
+        
+        // 是否正在执行中断
+        bool m_is_executing_interrupt = false;
+        // 正在执行的中断类型
+        CPU6502InterruptType m_executing_interrupt_type = CPU6502InterruptType::BRK;
 
         // 总的周期数
         std::uint32_t m_cycles = 0;

@@ -9,4 +9,18 @@ namespace nes
         OneScreenLowerBank,
         OneScreenUpperBank,
     };
+
+    enum class InputKey
+    {
+        A,
+        B,
+        Select,
+        Start,
+        Up,
+        Down,
+        Left,
+        Right,
+        TurboA,
+        TurboB,
+    };
 }

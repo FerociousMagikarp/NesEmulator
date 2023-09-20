@@ -115,7 +115,7 @@ namespace nes
             else if (address == 0x4014) // OAMDMA
             {
                 m_CPU.SkipOAMDMACycle();
-                m_PPU.OAMDMA(m_RAM.get() + (value << 8));
+                m_PPU.OAMDMA(m_RAM.get() + ((value << 8) & 0x700));
             }
             if (address == 0x4016)
                 m_device->Write4016(value);
