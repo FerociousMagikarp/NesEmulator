@@ -10,7 +10,7 @@ A simple NES emulator written in C++. It is still under development.
 
 ## Dependencies
 * SDL2
-* C++17 compiler
+* C++20 compiler
 
 ## Usage
 To run a .nes image,

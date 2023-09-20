@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.8)
 
 project(NesEmulator)
 
 
-set(CMAKE_CXX_STANDARD 17) 
+set(CMAKE_CXX_STANDARD 20) 
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_EXPORT_COMPILECOMMANDS ON)
 
@@ -31,4 +31,3 @@ if (${CMAKE_CXX_COMPILER_ID} MATCHES "GNU" AND ${CMAKE_SYSTEM_NAME} MATCHES "Win
 else()
     target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
 endif()
-message("aaa : ${CMAKE_SYSTEM_NAME}")
