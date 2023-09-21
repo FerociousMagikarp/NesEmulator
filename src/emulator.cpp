@@ -7,7 +7,7 @@
 
 namespace nes
 {
-    constexpr int NTSC_CPU_FREQUENCY = 1789773; // 之后精细控制时钟周期的时候再用
+    constexpr int NTSC_CPU_FREQUENCY = 1789773;
 
     NesEmulator::NesEmulator()
         : m_RAM(std::make_unique<std::uint8_t[]>(0x0800))
@@ -29,19 +29,22 @@ namespace nes
     {
         m_CPU.Reset();
         m_PPU.Reset();
-        static auto last_time = std::chrono::high_resolution_clock::now();
+        auto last_time = std::chrono::steady_clock::now();
         while (running)
         {
-            auto current_time = std::chrono::high_resolution_clock::now();
+            auto current_time = std::chrono::steady_clock::now();
             auto delta_time = current_time - last_time;
-            if (delta_time > std::chrono::nanoseconds(559))
+            double time_s = delta_time.count() / 1000000000.0;
+            int step_n = static_cast<int>(time_s * NTSC_CPU_FREQUENCY);
+            last_time += std::chrono::nanoseconds(step_n * 1000000000ll / NTSC_CPU_FREQUENCY);
+            while (step_n-- > 0)
             {
-                last_time += std::chrono::nanoseconds(559);
                 m_PPU.Step();
                 m_PPU.Step();
                 m_PPU.Step();
                 m_CPU.Step();
             }
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
         }
     }
 
