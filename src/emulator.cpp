@@ -16,6 +16,7 @@ namespace nes
         m_PPU.SetWriteMapperCHRCallback([this](std::uint16_t addr, std::uint8_t val)->void{ m_cartridge->GetMapper()->WriteCHR(addr, val); });
         m_PPU.SetNMICallback([this]()->void{ m_CPU.Interrupt(CPU6502InterruptType::NMI); });
         m_APU.SetIRQCallback([this]()->void{ m_CPU.Interrupt(CPU6502InterruptType::IRQ); });
+        m_APU.SetDMCReadCallback([this](std::uint16_t addr)->std::uint8_t{ return MainBusRead(addr); });
     }
 
     NesEmulator::~NesEmulator()

@@ -78,7 +78,18 @@ namespace nes
             void SetLengthCounter(std::uint8_t val);
 
             void Step();
+            void StepEnvelope();
             std::uint8_t Output();
+
+            bool constant_volume = false;
+            std::uint8_t volume = 0;
+            bool mode_flag = false;
+            std::uint8_t timer_period = 0;
+            bool envelope_start_flag = false;
+            std::uint8_t envelope_value = 0;
+            std::uint8_t envelope_volume = 0;
+            std::uint16_t shift_register = 1;
+            std::uint8_t cur_time = 0;
         };
 
         struct DMC : public Channel
@@ -90,6 +101,21 @@ namespace nes
 
             void Step();
             std::uint8_t Output();
+
+            bool IRQ_enable = false;
+            bool loop = false;
+            std::uint8_t load_counter = 0;
+            std::uint8_t frequency = 0;
+            std::uint8_t cur_freq = 0;
+            std::uint16_t sample_address = 0;
+            std::uint16_t sample_length = 0;
+            std::uint16_t cur_address = 0;
+            std::uint16_t cur_length = 0;
+            std::uint8_t shift_reg = 0;
+            std::uint8_t shift_count = 0;
+            std::uint8_t output = 0;
+            
+            std::function<std::uint8_t(std::uint16_t)> read_callback;
         };
     }
 
@@ -108,7 +134,8 @@ namespace nes
             std::uint8_t ReadStatus();
 
             // 本来硬件上APU和CPU在一块的，但是写的时候分开了，所以中断只能回调了，无奈出此下策
-            void SetIRQCallback(std::function<void()>&& callback) { m_trigger_IRQ = std::move(callback); }
+            inline void SetIRQCallback(std::function<void()>&& callback) { m_trigger_IRQ = std::move(callback); }
+            inline void SetDMCReadCallback(std::function<std::uint8_t(std::uint16_t)>&& callback) { m_DMC.read_callback = std::move(callback); }
 
         private:
             std::function<void()> m_trigger_IRQ;
@@ -123,8 +150,9 @@ namespace nes
             unsigned int m_cycles = 0;
             unsigned int m_frame_cycles = 0;
 
-            bool m_mode;
-            bool m_interrupt;
+            bool m_mode = false;
+            bool m_interrupt = false;
+            bool m_frame_interrupt = false;
 
             float m_output_record = 0.0f;
             float m_frame_counter = 0.0f;

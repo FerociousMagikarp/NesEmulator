@@ -43,7 +43,7 @@ namespace nes
             1, 0, 0, 1, 1, 1, 1, 1
         };
         constexpr std::array<int, 32> TRIANGLE_DUTY_TABLE = GenerateTriangleDutyTable();
-        constexpr std::array<int, 32> COUNTER_VALUE_TABLE = 
+        constexpr std::array<int, 32> LENGTH_COUNTER_TABLE = 
         {
             10, 254, 20,  2, 40,  4, 80,  6, 160,  8, 60, 10, 14, 12, 26, 14,
             12,  16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30
@@ -51,6 +51,10 @@ namespace nes
         constexpr std::array<int, 16> NTSC_NOISE_TABLE = 
         {
             4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068
+        };
+        constexpr std::array<int, 16> NTSC_DMC_TABLE = 
+        {
+            428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106,  84,  72,  54
         };
     }
 
@@ -69,26 +73,29 @@ namespace nes
 
         m_triangle.Step();
 
-        if (m_cycles++ % 2 != 0)
-            return;
+        if (m_cycles++ % 2 == 0)
+        {
+            m_pulse1.Step();
+            m_pulse2.Step();
+            m_noise.Step();
+            m_DMC.Step();
+        }
 
-        m_pulse1.Step();
-        m_pulse2.Step();
-        m_noise.Step();
-        m_DMC.Step();
-
-        m_frame_counter += 2.0f;
+        m_frame_counter += 1.0f;
         if (m_frame_counter > CPU_FRAME_RATIO)
         {
             m_frame_counter -= CPU_FRAME_RATIO;
-            m_frame_cycles++;
             if (!m_mode)
             {
-                switch (m_frame_cycles % 4)
+                m_frame_cycles = m_frame_cycles % 4;
+                switch (m_frame_cycles)
                 {
                     case 3:
                         if (m_interrupt)
+                        {
                             m_trigger_IRQ();
+                            m_frame_interrupt = true;
+                        }
                         [[fallthrough]];
                     case 1:
                         m_pulse1.StepLength();
@@ -103,12 +110,14 @@ namespace nes
                         m_pulse1.StepEnvelope();
                         m_pulse2.StepEnvelope();
                         m_triangle.StepCounter();
+                        m_noise.StepEnvelope();
                         break;
                 }
             }
             else
             {
-                switch (m_frame_cycles % 5)
+                m_frame_cycles = m_frame_cycles % 5;
+                switch (m_frame_cycles)
                 {
                     case 3:
                         break;
@@ -126,12 +135,14 @@ namespace nes
                         m_pulse1.StepEnvelope();
                         m_pulse2.StepEnvelope();
                         m_triangle.StepCounter();
+                        m_noise.StepEnvelope();
                         break;
                 }
             }
+            m_frame_cycles++;
         }
 
-        m_output_record += 2.0f;
+        m_output_record += 1.0f;
         if (m_output_record > CPU_AUDIO_RATIO)
         {
             m_output_record -= CPU_AUDIO_RATIO;
@@ -223,11 +234,36 @@ namespace nes
                 if (!m_noise.enable)
                     m_noise.length_counter = 0;
                 if (!m_DMC.enable)
-                    m_DMC.length_counter = 0;
+                    m_DMC.cur_length = 0;
+                else if (m_DMC.cur_length == 0)
+                {
+                    m_DMC.cur_address = m_DMC.sample_address;
+                    m_DMC.cur_length = m_DMC.sample_length;
+                }
                 break;
             case 0x17:
                 m_mode = val & 0x80;
-                m_interrupt = val & 0x40;
+                if ((val & 0x40) != 0)
+                {
+                    m_interrupt = false;
+                    m_frame_interrupt = false;
+                }
+                else
+                    m_interrupt = true;
+                m_frame_cycles = 0;
+                if (m_mode)
+                {
+                    m_pulse1.StepLength();
+                    m_pulse2.StepLength();
+                    m_triangle.StepLength();
+                    m_noise.StepLength();
+                    m_pulse1.StepSweep();
+                    m_pulse2.StepSweep();
+                    m_pulse1.StepEnvelope();
+                    m_pulse2.StepEnvelope();
+                    m_triangle.StepCounter();
+                    m_noise.StepEnvelope();
+                }
                 break;
             default:
                 break;
@@ -236,18 +272,17 @@ namespace nes
 
     std::uint8_t APU::ReadStatus()
     {
-        // 还有一些OpenBus、同一帧不清标记等没实现。
         std::uint8_t result = 0;
-        if (m_interrupt)
+        if (m_frame_interrupt)
         {
             result |= 0x40;
-            m_interrupt = false;
+            m_frame_interrupt = false;
         }
         result |= ((m_DMC.length_counter > 0) << 4);
-        result |= ((m_noise.length_counter > 0) << 3);
-        result |= ((m_triangle.length_counter > 0) << 2);
-        result |= ((m_pulse2.length_counter > 0) << 1);
-        result |= ((m_pulse1.length_counter > 0) << 0);
+        result |= (((m_noise.length_counter > 0) << 3));
+        result |= (((m_triangle.length_counter > 0) << 2));
+        result |= (((m_pulse2.length_counter > 0) << 1));
+        result |= (((m_pulse1.length_counter > 0) << 0));
         return result;
     }
 
@@ -271,7 +306,7 @@ namespace nes
         {
             enable_sweep = val & 0x80;
             negate_flag = val & 0x08;
-            divider_period = (val & 0x70) >> 4;
+            divider_period = ((val & 0x70) >> 4) + 1;
             shift_count = val & 0x07;
             sweep_reload_flag = true;
         }
@@ -287,8 +322,9 @@ namespace nes
             timer &= 0x00ff;
             timer |= static_cast<std::uint16_t>(val & 0x07) << 8;
             if (enable)
-                length_counter = meta::COUNTER_VALUE_TABLE[(val >> 3) & 0x1f];
+                length_counter = meta::LENGTH_COUNTER_TABLE[(val >> 3) & 0x1f];
             envelope_start_flag = true;
+            cur_duty = 0;
         }
 
         void Pulse::Step()
@@ -311,8 +347,10 @@ namespace nes
                 envelope_volume = 15;
                 envelope_value = constant_volume;
                 envelope_start_flag = false;
+                return;
             }
-            else if (envelope_value > 0)
+
+            if (envelope_value > 0)
             {
                 envelope_value--;
             }
@@ -334,8 +372,10 @@ namespace nes
                     Sweep();
                 sweep_value = divider_period;
                 sweep_reload_flag = false;
+                return;
             }
-            else if (sweep_value > 0)
+
+            if (sweep_value > 0)
             {
                     sweep_value--;
             }
@@ -349,16 +389,19 @@ namespace nes
 
         void Pulse::Sweep()
         {
-            std::uint8_t delta = divider_period >> shift_count;
+            std::uint16_t delta = (timer & 0x07ff) >> shift_count;
             if (negate_flag)
             {
-                cur_time -= delta;
                 if (channel == 1)
-                    cur_time--;
+                    delta += 1;
+                if (delta >= timer)
+                    timer = 0;
+                else
+                    timer -= delta;
             }
             else
             {
-                cur_time += delta;
+                timer += delta;
             }
         }
 
@@ -389,7 +432,7 @@ namespace nes
             timer &= 0x00ff;
             timer |= static_cast<std::uint16_t>(val & 0x07) << 8;
             if (enable)
-                length_counter = meta::COUNTER_VALUE_TABLE[(val >> 3) & 0x1f];
+                length_counter = meta::LENGTH_COUNTER_TABLE[(val >> 3) & 0x1f];
             counter_reload_flag = true;
         }
 
@@ -427,57 +470,147 @@ namespace nes
 
         void Noise::SetControl(std::uint8_t val)
         {
-
+            length_counter_halt = val & 0x20;
+            constant_volume = val & 0x10;
+            volume = val & 0x0f;
         }
 
         void Noise::SetNoisePeriod(std::uint8_t val)
         {
-
+            mode_flag = val & 0x80;
+            timer_period = meta::NTSC_NOISE_TABLE[val & 0x0f];
         }
 
         void Noise::SetLengthCounter(std::uint8_t val)
         {
-
+            if (enable)
+                length_counter = meta::LENGTH_COUNTER_TABLE[(val >> 3) & 0x1f];
+            envelope_start_flag = true;
         }
 
         void Noise::Step()
         {
+            if (cur_time > 0)
+            {
+                cur_time--;
+            }
+            else
+            {
+                std::uint16_t val = 0;
+                if (mode_flag)
+                    val = ((shift_register >> 6) ^ shift_register) & 0x0001;
+                else
+                    val = ((shift_register >> 1) ^ shift_register) & 0x0001;
+                shift_register >>= 1;
+                shift_register |= (val << 14);
 
+                cur_time = timer_period;
+            }
+        }
+
+        void Noise::StepEnvelope()
+        {
+            if (envelope_start_flag)
+            {
+                envelope_volume = 15;
+                envelope_value = constant_volume;
+                envelope_start_flag = false;
+                return;
+            }
+            
+            if (envelope_value > 0)
+            {
+                envelope_value--;
+            }
+            else
+            {
+                if (envelope_volume > 0)
+                    envelope_volume--;
+                else if (length_counter_halt)
+                    envelope_volume = 15;
+                envelope_value = constant_volume;
+            }
         }
 
         std::uint8_t Noise::Output()
         {
-            return 0;
+            if (!enable || length_counter == 0 || (shift_register & 0x01) == 1)
+                return 0;
+            if (constant_volume)
+                return volume;
+            else
+                return envelope_volume;
         }
 
         void DMC::SetControl(std::uint8_t val)
         {
-
+            IRQ_enable = val & 0x80;
+            loop = val & 0x40;
+            frequency = meta::NTSC_DMC_TABLE[val & 0x0f];
         }
 
         void DMC::SetLoadCounter(std::uint8_t val)
         {
-
+            load_counter = val & 0x7f;
         }
 
         void DMC::SetSampleAddress(std::uint8_t val)
         {
-
+            sample_address = 0xc000 | (static_cast<std::uint16_t>(val) << 6);
         }
 
         void DMC::SetSampleLength(std::uint8_t val)
         {
-
+            sample_length = (static_cast<std::uint16_t>(val) << 4) + 1;
         }
 
         void DMC::Step()
         {
+            if (!enable)
+                return;
 
+            if (cur_length > 0 && shift_count == 0) // 需要重新读一下数据
+            {
+                shift_reg = read_callback(cur_address++);
+                shift_count = 8;
+                cur_address |= 0x8000;
+                if (--cur_length == 0 && loop)
+                {
+                    cur_address = sample_address;
+                    cur_length = sample_length;
+                }
+            }
+
+            if (cur_freq > 0)
+            {
+                cur_freq--;
+            }
+            else
+            {
+                cur_freq = frequency;
+                if (shift_count > 0)
+                {
+                    if (shift_reg & 1)
+                    {
+                        if (output <= 125)
+                            output += 2;
+                    }
+                    else
+                    {
+                        if (output >= 2)
+                            output -= 2;
+                    }
+                    shift_count >>= 1;
+                    shift_count--;
+                }
+            }
         }
 
         std::uint8_t DMC::Output()
         {
-            return 0;
+            if (!enable)
+                return 0;
+            return output;
         }
     }
 }

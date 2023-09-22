@@ -25,7 +25,7 @@ bool SDLApplication::Init(int width, int height)
     SDL_AudioSpec spec
     {
         .freq = nes::AUDIO_FREQ,
-        .format = AUDIO_S8,
+        .format = AUDIO_U8,
         .channels = 1,
         .silence = 0,
         .samples = nes::AUDIO_BUFFER_SAMPLES,
@@ -151,6 +151,7 @@ void SDLApplication::Run(bool &running)
         SDL_RenderCopy(m_renderer, m_texture, nullptr, nullptr);
         SDL_RenderPresent(m_renderer);
     }
+    SDL_CloseAudio();
 }
 
 void SDLApplication::FillAudioBuffer(unsigned char* stream, int len)
