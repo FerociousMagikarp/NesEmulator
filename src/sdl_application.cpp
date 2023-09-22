@@ -20,6 +20,27 @@ bool SDLApplication::Init(int width, int height)
     m_window = SDL_CreateWindow("NesEmulator", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_SHOWN);
     m_renderer = SDL_CreateRenderer(m_window, -1, SDL_RENDERER_ACCELERATED);
     m_texture = SDL_CreateTexture(m_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TextureAccess::SDL_TEXTUREACCESS_STREAMING, nes::NES_WIDTH, nes::NES_HEIGHT);
+
+    // 音频相关部分。如果这部分初始化失败了就不播放声音。
+    SDL_AudioSpec spec
+    {
+        .freq = nes::AUDIO_FREQ,
+        .format = AUDIO_S8,
+        .channels = 1,
+        .silence = 0,
+        .samples = nes::AUDIO_BUFFER_SAMPLES,
+        .userdata = this,
+    };
+    spec.callback = [](void* userdata, Uint8* stream, int len)->void
+    {
+        static_cast<SDLApplication*>(userdata)->FillAudioBuffer(stream, len);
+    };
+
+    if (SDL_OpenAudio(&spec, nullptr) == 0)
+    {
+        SDL_PauseAudio(0);
+    }
+
     return true;
 }
 
@@ -130,4 +151,11 @@ void SDLApplication::Run(bool &running)
         SDL_RenderCopy(m_renderer, m_texture, nullptr, nullptr);
         SDL_RenderPresent(m_renderer);
     }
+}
+
+void SDLApplication::FillAudioBuffer(unsigned char* stream, int len)
+{
+    if (!m_device)
+        return;
+    m_device->FillAudioSamples(stream, len);
 }

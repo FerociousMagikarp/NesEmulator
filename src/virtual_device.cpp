@@ -38,6 +38,39 @@ namespace nes
         m_cond.notify_one();
     }
 
+    void VirtualDevice::FillAudioSamples(unsigned char* stream, int len)
+    {
+        if (m_audio_samples.size() > 1)
+        {
+            std::lock_guard<std::mutex> lock(m_audio_mutex);
+            for (int i = 0; i < len; i++)
+            {
+                stream[i] = m_audio_samples.front().data[i];
+            }
+            m_garbage_audio_samples.splice(m_garbage_audio_samples.cend(), m_audio_samples, m_audio_samples.cbegin());
+        }
+    }
+
+    void VirtualDevice::PutAudioSample(std::uint8_t sample)
+    {
+        if (m_audio_samples.empty() || m_audio_samples.back().index >= AUDIO_BUFFER_SAMPLES)
+        {
+            // 添加新的buffer放在这
+            std::lock_guard<std::mutex> lock(m_audio_mutex);
+            if (!m_garbage_audio_samples.empty())
+            {
+                m_audio_samples.splice(m_audio_samples.cend(), m_garbage_audio_samples, m_garbage_audio_samples.cbegin());
+                m_audio_samples.back().index = 0;
+            }
+            else
+            {
+                m_audio_samples.push_back(AudioSamples{});
+            }
+        }
+        auto& container = m_audio_samples.back();
+        container.data[container.index++] = sample;
+    }
+
     void VirtualDevice::Write4016(std::uint8_t val)
     {
         m_strobe = val & 0x7; // 就后三位有用，虽然目前只用最后一位

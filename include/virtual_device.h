@@ -5,6 +5,8 @@
 #include <memory>
 #include <mutex>
 #include <functional>
+#include <list>
+#include "def.h"
 
 namespace nes
 {
@@ -32,6 +34,9 @@ namespace nes
             void StartPPURender();
             void EndPPURender();
 
+            void FillAudioSamples(unsigned char* stream, int len);
+            void PutAudioSample(std::uint8_t sample);
+
             void Write4016(std::uint8_t val);
             std::uint8_t Read4016();
             std::uint8_t Read4017();
@@ -57,9 +62,21 @@ namespace nes
             std::mutex m_mutex;
             std::condition_variable m_cond;
 
+            // 操作音频buffer的时候加的锁
+            std::mutex m_audio_mutex;
+
             std::function<void(void)> m_app_update_callback;
 
             bool m_can_app_update = false;
             std::uint8_t m_strobe = 0;
+
+            struct AudioSamples
+            {
+                std::array<std::uint8_t, AUDIO_BUFFER_SAMPLES> data;
+                unsigned int index = 0;
+            };
+
+            std::list<AudioSamples> m_audio_samples;
+            std::list<AudioSamples> m_garbage_audio_samples;
     };
 }

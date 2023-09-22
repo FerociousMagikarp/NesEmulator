@@ -26,6 +26,7 @@ namespace nes
         { 
             m_device = device;
             m_PPU.SetDevice(device);
+            m_APU.SetDevice(device);
         }
 
     private:

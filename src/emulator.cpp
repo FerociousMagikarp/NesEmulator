@@ -7,8 +7,6 @@
 
 namespace nes
 {
-    constexpr int NTSC_CPU_FREQUENCY = 1789773;
-
     NesEmulator::NesEmulator()
         : m_RAM(std::make_unique<std::uint8_t[]>(0x0800))
     {
@@ -29,6 +27,7 @@ namespace nes
     {
         m_CPU.Reset();
         m_PPU.Reset();
+        m_APU.Reset();
         auto last_time = std::chrono::steady_clock::now();
         while (running)
         {
@@ -43,6 +42,7 @@ namespace nes
                 m_PPU.Step();
                 m_PPU.Step();
                 m_CPU.Step();
+                m_APU.Step(); // APU自己在里面降频吧，因为三角波是CPU周期刷新的。
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(2));
         }

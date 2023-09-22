@@ -1,6 +1,7 @@
 #include "ppu.h"
 #include <cstdint>
 #include <wchar.h>
+#include "virtual_device.h"
 
 namespace nes
 {

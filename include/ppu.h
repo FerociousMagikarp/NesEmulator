@@ -1,6 +1,5 @@
 #pragma once
 
-#include "virtual_device.h"
 #include <array>
 #include <cstdint>
 #include <functional>
@@ -12,7 +11,7 @@
 namespace nes
 {
     class Cartridge;
-    class Device;
+    class VirtualDevice;
 
     // PPU协程返回用
     struct PPUCycleCoro

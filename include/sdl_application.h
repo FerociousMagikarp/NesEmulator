@@ -22,6 +22,7 @@ class SDLApplication
         void Run(bool& running);
 
         void SetVirtualDevice(std::shared_ptr<nes::VirtualDevice> device);
+        void FillAudioBuffer(unsigned char* stream, int len);
 
     private:
 
