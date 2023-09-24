@@ -39,7 +39,6 @@ It will support configuring soon.
 |Right|D|Right|Right|
 
 ## Future
-* Add APU support
 * Support more mappers
 * Fix bugs(For example, PPU timing.)
 * ...

@@ -315,6 +315,7 @@ namespace nes
         {
             timer &= 0xff00;
             timer |= static_cast<std::uint16_t>(val);
+            sweep_muting = false;
         }
 
         void Pulse::SetTimerHigh(std::uint8_t val)
@@ -325,6 +326,7 @@ namespace nes
                 length_counter = meta::LENGTH_COUNTER_TABLE[(val >> 3) & 0x1f];
             envelope_start_flag = true;
             cur_duty = 0;
+            sweep_muting = false;
         }
 
         void Pulse::Step()
@@ -345,7 +347,7 @@ namespace nes
             if (envelope_start_flag)
             {
                 envelope_volume = 15;
-                envelope_value = constant_volume;
+                envelope_value = volume;
                 envelope_start_flag = false;
                 return;
             }
@@ -360,7 +362,7 @@ namespace nes
                     envelope_volume--;
                 else if (length_counter_halt)
                     envelope_volume = 15;
-                envelope_value = constant_volume;
+                envelope_value = volume;
             }
         }
 
@@ -368,7 +370,7 @@ namespace nes
         {
             if (sweep_reload_flag)
             {
-                if (enable_sweep && sweep_value == 0)
+                if (enable_sweep && sweep_value == 0 && !sweep_muting)
                     Sweep();
                 sweep_value = divider_period;
                 sweep_reload_flag = false;
@@ -377,11 +379,11 @@ namespace nes
 
             if (sweep_value > 0)
             {
-                    sweep_value--;
+                sweep_value--;
             }
             else
             {
-                if (enable_sweep)
+                if (enable_sweep && !sweep_muting)
                     Sweep();
                 sweep_value = divider_period;
             }
@@ -390,25 +392,37 @@ namespace nes
         void Pulse::Sweep()
         {
             std::uint16_t delta = (timer & 0x07ff) >> shift_count;
+            std::uint16_t target_period = timer;
             if (negate_flag)
             {
                 if (channel == 1)
                     delta += 1;
-                if (delta >= timer)
-                    timer = 0;
+                if (delta >= target_period)
+                    target_period = 0;
                 else
-                    timer -= delta;
+                    target_period -= delta;
             }
             else
             {
-                timer += delta;
+                target_period += delta;
             }
+
+            if (target_period < 8 || target_period > 0x7ff)
+            {
+                sweep_muting = true;
+                return;
+            }
+            if (shift_count > 0)
+                timer = target_period;
         }
 
         std::uint8_t Pulse::Output()
         {
-            if (!enable || length_counter == 0 || meta::PULSE_DUTY_TABLE[duty][cur_duty] == 0 || cur_time < 8 || cur_time > 0x7ff)
+            if (!enable || length_counter == 0 || meta::PULSE_DUTY_TABLE[duty][cur_duty] == 0 || timer < 8 || sweep_muting)
+            {
                 return 0;
+            }
+
             if (constant_volume)
                 return volume;
             else
@@ -513,7 +527,7 @@ namespace nes
             if (envelope_start_flag)
             {
                 envelope_volume = 15;
-                envelope_value = constant_volume;
+                envelope_value = volume;
                 envelope_start_flag = false;
                 return;
             }
@@ -528,7 +542,7 @@ namespace nes
                     envelope_volume--;
                 else if (length_counter_halt)
                     envelope_volume = 15;
-                envelope_value = constant_volume;
+                envelope_value = volume;
             }
         }
 

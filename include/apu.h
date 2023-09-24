@@ -51,6 +51,7 @@ namespace nes
             std::uint8_t shift_count = 0;
             bool sweep_reload_flag = false;
             std::uint8_t sweep_value = 0;
+            bool sweep_muting = false;
         };
 
         struct Triangle : public Channel
