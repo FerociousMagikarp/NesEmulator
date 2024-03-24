@@ -2,7 +2,6 @@
 #include "palette.h"
 #include <assert.h>
 #include <cstdint>
-#include <iostream>
 
 namespace nes
 {
@@ -14,9 +13,54 @@ namespace nes
         m_app_update_callback();
     }
 
-    void VirtualDevice::ApplicationSetControllers(std::uint8_t controller1, std::uint8_t controller2)
+    void VirtualDevice::ApplicationKeyDown(Player player, InputKey key)
     {
-        m_controllers = static_cast<std::uint16_t>(controller1) << 8 | controller2;
+        m_keyboard[static_cast<int>(player)][static_cast<int>(key)] = true;
+    }
+
+    void VirtualDevice::ApplicationKeyUp(Player player, InputKey key)
+    {
+        m_keyboard[static_cast<int>(player)][static_cast<int>(key)] = false;
+    }
+
+    bool VirtualDevice::IsKeyDown(Player player, InputKey key) const
+    {
+        return m_keyboard[static_cast<int>(player)][static_cast<int>(key)];
+    }
+
+    void VirtualDevice::TurboTick()
+    {
+        using enum Player;
+        using enum InputKey;
+
+        // 如果没有按下连发键就不需要更新时间了
+        if (!(IsKeyDown(Player1, TurboA) || IsKeyDown(Player1, TurboB) || IsKeyDown(Player2, TurboA) || IsKeyDown(Player2, TurboB)))
+            return;
+
+        auto now = std::chrono::steady_clock::now();
+        auto delta_time = now - m_turbo_time;
+        if (delta_time.count() / 1000000 >= m_turbo_time_interval_ms / 2)
+        {
+            m_is_turbo = !m_is_turbo;
+            m_turbo_time = now;
+        }
+    }
+
+    std::uint8_t VirtualDevice::GetNesKey(Player player) const
+    {
+        std::uint8_t res = 0;
+        for (int i = 0; i < 8; i++)
+        {
+            res |= (static_cast<std::uint8_t>(m_keyboard[static_cast<int>(player)][i]) << i);
+        }
+        if (m_is_turbo)
+        {
+            if (IsKeyDown(player, InputKey::TurboA))
+                res |= 1;
+            if (IsKeyDown(player, InputKey::TurboB))
+                res |= 2;
+        }
+        return res;
     }
 
     void VirtualDevice::StartPPURender()
@@ -26,6 +70,12 @@ namespace nes
             std::lock_guard<std::mutex> lock(m_mutex);
             m_can_app_update = false;
         }
+
+        // 每次PPU刷新帧开始的时候把按键更新了
+        auto c1 = GetNesKey(Player::Player1);
+        auto c2 = GetNesKey(Player::Player2);
+        m_controllers = static_cast<std::uint16_t>(c1) << 8 | c2;
+        TurboTick();
     }
 
     void VirtualDevice::EndPPURender()

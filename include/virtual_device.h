@@ -19,17 +19,20 @@ namespace nes
             VirtualDevice() : m_screen(std::make_unique<std::uint8_t[]>(NES_WIDTH * NES_HEIGHT * 4)) {}
             ~VirtualDevice() = default;
 
-            inline const int GetWidth() const { return NES_WIDTH * m_scale; }
-            inline const int GetHeight() const { return NES_HEIGHT * m_scale; }
+            inline const int GetWidth() const noexcept { return NES_WIDTH * m_scale; }
+            inline const int GetHeight() const noexcept { return NES_HEIGHT * m_scale; }
 
-            inline void SetScale(int scale) { m_scale = scale; }
-            inline const int GetScale() const { return m_scale; }
+            inline void SetScale(int scale) noexcept { m_scale = scale; }
+            inline const int GetScale() const noexcept { return m_scale; }
+            inline void SetTurboTimeIntervalMs(std::uint64_t val) noexcept { m_turbo_time_interval_ms = val; }
+            inline std::uint64_t GetTurboTimeIntervalMs() const noexcept { return m_turbo_time_interval_ms; }
 
-            inline std::uint8_t* GetScreenPointer() const { return m_screen.get(); }
+            inline std::uint8_t* GetScreenPointer() const noexcept { return m_screen.get(); }
             inline void SetApplicationUpdateCallback(std::function<void(void)>&& callback) { m_app_update_callback = std::move(callback); }
 
             void ApplicationUpdate();
-            void ApplicationSetControllers(std::uint8_t controller1, std::uint8_t controller2);
+            void ApplicationKeyDown(Player player, InputKey key);
+            void ApplicationKeyUp(Player player, InputKey key);
 
             void StartPPURender();
             void EndPPURender();
@@ -48,9 +51,13 @@ namespace nes
             void SetPixel(int x, int y, int palette_index);
             
         private:
+            void TurboTick();
+            std::uint8_t GetNesKey(Player player) const;
+            bool IsKeyDown(Player player, InputKey key) const;
+
             int m_scale = 3;
 
-            // 两个手柄按键放一块了，为了不加锁，先1再2
+            // 两个手柄按键放一块了，先1再2
             // 顺序 ： → ← ↓ ↑ Start Select B A
             std::uint16_t m_controllers = 0;
             std::uint8_t m_shift_controller1 = 0;
@@ -69,6 +76,13 @@ namespace nes
 
             bool m_can_app_update = false;
             std::uint8_t m_strobe = 0;
+
+            // 两个player，10种按键（包括连发），先这么写
+            std::array<std::array<bool, 10>, 2> m_keyboard{};
+            bool m_is_turbo = false;
+
+            std::uint64_t m_turbo_time_interval_ms = 48;
+            std::chrono::steady_clock::time_point m_turbo_time{};
 
             struct AudioSamples
             {

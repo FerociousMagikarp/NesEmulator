@@ -53,99 +53,42 @@ void SDLApplication::SetVirtualDevice(std::shared_ptr<nes::VirtualDevice> device
     m_device = std::move(device);
 }
 
-void SDLApplication::KeyDown(nes::InputKey key, int player)
-{
-    if (key != nes::InputKey::TurboA && key != nes::InputKey::TurboB)
-    {
-        m_joy |= 1 << (static_cast<int>(key) + player * 8);
-    }
-    else
-    {
-        int key_index = static_cast<int>(key != nes::InputKey::TurboA);
-        int turbo_index = key_index + player * 2;
-        if (!m_turbo_keys[turbo_index].enable)
-        {
-            m_turbo_keys[turbo_index].enable = true;
-            m_turbo_keys[turbo_index].time = m_current_time;
-            m_joy |= 1 << (key_index + player * 8);
-        }
-    }
-}
-
-void SDLApplication::KeyUp(nes::InputKey key, int player)
-{
-    if (key != nes::InputKey::TurboA && key != nes::InputKey::TurboB)
-    {
-        m_joy &= ~(1 << (static_cast<int>(key) + player * 8));
-    }
-    else
-    {
-        int key_index = static_cast<int>(key != nes::InputKey::TurboA);
-        m_joy &= ~(1 << (key_index + player * 8));
-        m_turbo_keys[key_index + player * 2].enable = false;
-    }
-}
-
-void SDLApplication::TurboTick()
-{
-    for (int i = 0; i < 4; i++)
-    {
-        if (!m_turbo_keys[i].enable)
-            continue;
-        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(m_current_time - m_turbo_keys[i].time).count();
-        if (ms % m_turbo_time % 2 == 0)
-            m_joy |= 1 << ((i & 0x01) | ((i & 0x02) << 2));
-        else
-            m_joy &= ~(1 << ((i & 0x01) | ((i & 0x02) << 2)));
-    }
-}
-
 void SDLApplication::Run(bool &running)
 {
-    m_current_time = std::chrono::steady_clock::now();
-
-    m_keyboard_map[SDLK_k] = {nes::InputKey::A, 0};               m_keyboard_map[SDLK_j] = {nes::InputKey::B, 0};
-    m_keyboard_map[SDLK_SEMICOLON] = {nes::InputKey::Select, 0};  m_keyboard_map[SDLK_RETURN] = {nes::InputKey::Start, 0};
-    m_keyboard_map[SDLK_w] = {nes::InputKey::Up, 0};              m_keyboard_map[SDLK_s] = {nes::InputKey::Down, 0};
-    m_keyboard_map[SDLK_a] = {nes::InputKey::Left, 0};            m_keyboard_map[SDLK_d] = {nes::InputKey::Right, 0};
-    m_keyboard_map[SDLK_i] = {nes::InputKey::TurboA, 0};          m_keyboard_map[SDLK_u] = {nes::InputKey::TurboB, 0};
-    m_keyboard_map[SDLK_KP_PERIOD] = {nes::InputKey::A, 1};       m_keyboard_map[SDLK_KP_0] = {nes::InputKey::B, 1};
-    m_keyboard_map[SDLK_KP_PLUS] = {nes::InputKey::Select, 1};    m_keyboard_map[SDLK_KP_ENTER] = {nes::InputKey::Start, 1};
-    m_keyboard_map[SDLK_UP] = {nes::InputKey::Up, 1};             m_keyboard_map[SDLK_DOWN] = {nes::InputKey::Down, 1};
-    m_keyboard_map[SDLK_LEFT] = {nes::InputKey::Left, 1};         m_keyboard_map[SDLK_RIGHT] = {nes::InputKey::Right, 1};
-    m_keyboard_map[SDLK_KP_2] = {nes::InputKey::TurboA, 1};       m_keyboard_map[SDLK_KP_1] = {nes::InputKey::TurboB, 1};
+    m_keyboard_map[SDLK_k] = {nes::InputKey::A, nes::Player::Player1};               m_keyboard_map[SDLK_j] = {nes::InputKey::B, nes::Player::Player1};
+    m_keyboard_map[SDLK_SEMICOLON] = {nes::InputKey::Select, nes::Player::Player1};  m_keyboard_map[SDLK_RETURN] = {nes::InputKey::Start, nes::Player::Player1};
+    m_keyboard_map[SDLK_w] = {nes::InputKey::Up, nes::Player::Player1};              m_keyboard_map[SDLK_s] = {nes::InputKey::Down, nes::Player::Player1};
+    m_keyboard_map[SDLK_a] = {nes::InputKey::Left, nes::Player::Player1};            m_keyboard_map[SDLK_d] = {nes::InputKey::Right, nes::Player::Player1};
+    m_keyboard_map[SDLK_i] = {nes::InputKey::TurboA, nes::Player::Player1};          m_keyboard_map[SDLK_u] = {nes::InputKey::TurboB, nes::Player::Player1};
+    m_keyboard_map[SDLK_KP_PERIOD] = {nes::InputKey::A, nes::Player::Player2};       m_keyboard_map[SDLK_KP_0] = {nes::InputKey::B, nes::Player::Player2};
+    m_keyboard_map[SDLK_KP_PLUS] = {nes::InputKey::Select, nes::Player::Player2};    m_keyboard_map[SDLK_KP_ENTER] = {nes::InputKey::Start, nes::Player::Player2};
+    m_keyboard_map[SDLK_UP] = {nes::InputKey::Up, nes::Player::Player2};             m_keyboard_map[SDLK_DOWN] = {nes::InputKey::Down, nes::Player::Player2};
+    m_keyboard_map[SDLK_LEFT] = {nes::InputKey::Left, nes::Player::Player2};         m_keyboard_map[SDLK_RIGHT] = {nes::InputKey::Right, nes::Player::Player2};
+    m_keyboard_map[SDLK_KP_2] = {nes::InputKey::TurboA, nes::Player::Player2};       m_keyboard_map[SDLK_KP_1] = {nes::InputKey::TurboB, nes::Player::Player2};
 
     while (running)
     {
         SDL_Event event;
-        m_current_time = std::chrono::steady_clock::now();
         while (SDL_PollEvent(&event))
         {
-            std::unordered_map<SDL_Keycode, KeyInfo>::iterator key_iter;
-
             switch (event.type)
             {
             case SDL_QUIT:
                 running = false;
                 return;
             case SDL_KEYDOWN:
-                key_iter = m_keyboard_map.find(event.key.keysym.sym);
-                if (key_iter != m_keyboard_map.end())
-                    KeyDown(key_iter->second.key, key_iter->second.player);
+                if (auto iter = m_keyboard_map.find(event.key.keysym.sym); iter != m_keyboard_map.end())
+                    m_device->ApplicationKeyDown(iter->second.player, iter->second.key);
                 break;
             case SDL_KEYUP:
-                key_iter = m_keyboard_map.find(event.key.keysym.sym);
-                if (key_iter != m_keyboard_map.end())
-                    KeyUp(key_iter->second.key, key_iter->second.player);
+                if (auto iter = m_keyboard_map.find(event.key.keysym.sym); iter != m_keyboard_map.end())
+                    m_device->ApplicationKeyUp(iter->second.player, iter->second.key);
                 break;
             default:
                 break;
             }
         }
 
-        TurboTick();
-
-        m_device->ApplicationSetControllers(static_cast<std::uint8_t>(m_joy & 0xff), static_cast<std::uint8_t>(m_joy >> 8));
         m_device->ApplicationUpdate();
         SDL_RenderClear(m_renderer);
         SDL_RenderCopy(m_renderer, m_texture, nullptr, nullptr);
