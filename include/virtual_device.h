@@ -6,6 +6,7 @@
 #include <mutex>
 #include <functional>
 #include <list>
+#include <array>
 #include "def.h"
 
 namespace nes
