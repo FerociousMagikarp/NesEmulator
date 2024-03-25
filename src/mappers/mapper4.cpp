@@ -9,6 +9,8 @@ namespace nes
         if (cartridge->GetCHRRom().empty())
             m_CHR_ram = std::make_unique<std::uint8_t[]>(0x2000);
         m_PRG_bank[3] = static_cast<std::uint32_t>(cartridge->GetPRGRom().size()) - 0x2000;
+        m_CHR_bank[0] = 0;
+        m_CHR_bank[1] = 0x400;
     }
 
     std::uint8_t Mapper4::ReadCHR(std::uint16_t address)
@@ -138,17 +140,19 @@ namespace nes
             case 6: // R6: Select 8 KB PRG ROM bank at $8000-$9FFF (or $C000-$DFFF)
                 if (m_bank_select & 0x40)
                 {
-                    m_PRG_bank[0] = static_cast<std::uint32_t>(m_cartridge->GetPRGRom().size()) - 0x4000;
-                    m_PRG_bank[2] = static_cast<std::uint32_t>(val & 0x3f) << 13;
+                    auto size = static_cast<std::uint32_t>(m_cartridge->GetPRGRom().size());
+                    m_PRG_bank[0] = size - 0x4000;
+                    m_PRG_bank[2] = static_cast<std::uint32_t>(val & 0x3f) % (size >> 13) << 13;
                 }
                 else
                 {
-                    m_PRG_bank[0] = static_cast<std::uint32_t>(val & 0x3f) << 13;
-                    m_PRG_bank[2] = static_cast<std::uint32_t>(m_cartridge->GetPRGRom().size()) - 0x4000;
+                    auto size = static_cast<std::uint32_t>(m_cartridge->GetPRGRom().size());
+                    m_PRG_bank[0] = static_cast<std::uint32_t>(val & 0x3f) % (size >> 13) << 13;
+                    m_PRG_bank[2] = size - 0x4000;
                 }
                 break;
             case 7: // R7: Select 8 KB PRG ROM bank at $A000-$BFFF
-                m_PRG_bank[1] = static_cast<std::uint32_t>(val & 0x3f) << 13;
+                m_PRG_bank[1] = static_cast<std::uint32_t>(val & 0x3f) % (static_cast<std::uint32_t>(m_cartridge->GetPRGRom().size()) >> 13) << 13;
                 break;
         }
     }

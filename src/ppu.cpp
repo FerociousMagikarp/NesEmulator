@@ -106,7 +106,7 @@ namespace nes
                     // cycle -> [258, 320]
                     for (int cycle = 258; cycle <= 320; cycle++)
                     {
-                        if (cycle == 260 && IsBothBgAndSpEnabled())
+                        if (cycle == 260 && (IsShowBackgroundEnabled() || IsShowSpriteEnabled()))
                             m_mapper_reduce_IRQ_counter();
                         m_OAMADDR = 0;
                         co_await std::suspend_always{};
