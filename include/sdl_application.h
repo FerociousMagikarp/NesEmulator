@@ -1,15 +1,20 @@
 #pragma once
 
 #include "def.h"
-#include "virtual_device.h"
-#include <cstdint>
 #include <memory>
+#include <functional>
+#include <variant>
 #include <unordered_map>
 #include "SDL_keycode.h"
 
 struct SDL_Window;
 struct SDL_Renderer;
 struct SDL_Texture;
+
+namespace nes
+{
+    class VirtualDevice;
+}
 
 class SDLApplication
 {
@@ -23,6 +28,9 @@ class SDLApplication
         void SetVirtualDevice(std::shared_ptr<nes::VirtualDevice> device);
         void FillAudioBuffer(unsigned char* stream, int len);
 
+        void SetControl(nes::KeyCode key, nes::InputKey input, nes::Player player);
+        void SetControl(nes::KeyCode key, std::function<void()> func);
+
     private:
         SDL_Window* m_window;
         SDL_Renderer* m_renderer;
@@ -35,5 +43,5 @@ class SDLApplication
             nes::InputKey key;
             nes::Player player;
         };
-        std::unordered_map<SDL_Keycode, KeyInfo> m_keyboard_map;
+        std::unordered_map<SDL_Keycode, std::variant<KeyInfo, std::function<void()>>> m_keyboard_map;
 };

@@ -4,8 +4,23 @@
 #include "cartridge.h"
 #include "command_line.h"
 #include "emulator.h"
+#include "def.h"
 #include "sdl_application.h"
 #include "virtual_device.h"
+
+void SetInputControlConfig(SDLApplication& app, const nes::InputConfig config, nes::Player player)
+{
+    app.SetControl(config.A, nes::InputKey::A, player);
+    app.SetControl(config.B, nes::InputKey::B, player);
+    app.SetControl(config.Select, nes::InputKey::Select, player);
+    app.SetControl(config.Start, nes::InputKey::Start, player);
+    app.SetControl(config.Up, nes::InputKey::Up, player);
+    app.SetControl(config.Down, nes::InputKey::Down, player);
+    app.SetControl(config.Left, nes::InputKey::Left, player);
+    app.SetControl(config.Right, nes::InputKey::Right, player);
+    app.SetControl(config.TurboA, nes::InputKey::TurboA, player);
+    app.SetControl(config.TurboB, nes::InputKey::TurboB, player);
+}
 
 int main(int argc, char *argv[])
 {
@@ -15,6 +30,9 @@ int main(int argc, char *argv[])
         return 0;
     }
     
+    // 加载配置
+    nes::Config config;
+
     // 加载卡带
     std::unique_ptr<nes::Cartridge> cartridge = std::make_unique<nes::Cartridge>();
     if (!cartridge->LoadFromFile(CommandLine::GetInstance().GetNesPath().c_str()))
@@ -39,6 +57,8 @@ int main(int argc, char *argv[])
         return 0;
     }
     application.SetVirtualDevice(device);
+    SetInputControlConfig(application, config.Player1, nes::Player::Player1);
+    SetInputControlConfig(application, config.Player2, nes::Player::Player2);
 
     bool running = true;
 
