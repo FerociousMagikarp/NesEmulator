@@ -133,7 +133,7 @@ namespace nes
     MirroringType Mapper1::GetMirroringType(std::uint8_t mirroring)
     {
         // 根据 Control 寄存器的末两位决定镜像类型
-        switch (mirroring)
+        switch (mirroring & 0x03)
         {
             case 0:
                 return MirroringType::OneScreenLowerBank;
@@ -189,7 +189,6 @@ namespace nes
         pointer = UnsafeRead(pointer, m_control);
         pointer = UnsafeRead(pointer, m_CHR_bank0);
         pointer = UnsafeRead(pointer, m_CHR_bank1);
-        pointer = UnsafeRead(pointer, m_PRG_bank);
         pointer = UnsafeRead(pointer, m_PRG_bank);
         pointer = UnsafeRead(pointer, m_first_bank_PRG);
         pointer = UnsafeRead(pointer, m_last_bank_PRG);

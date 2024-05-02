@@ -35,12 +35,12 @@ namespace nes
         while (running)
         {
             auto current_time = std::chrono::steady_clock::now();
-            auto delta_time = current_time - last_time;
-            double time_s = delta_time.count() / 1000000000.0;
+            auto delta_time = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_time);
+            double time_s = delta_time.count() / 1000.0;
             int step_n = static_cast<int>(time_s * NTSC_CPU_FREQUENCY);
-            last_time += std::chrono::nanoseconds(step_n * 1000000000ll / NTSC_CPU_FREQUENCY);
             bool frame_changed = false;
-            while (step_n-- > 0)
+            int step_tick = 0;
+            while (step_tick++ < step_n)
             {
                 m_PPU.Step();
                 m_PPU.Step();
@@ -53,8 +53,12 @@ namespace nes
                 {
                     m_frame = PPU_frame;
                     frame_changed = true;
+                    break;
                 }
             }
+            constexpr auto remainder = 1000000000ll % NTSC_CPU_FREQUENCY;
+            constexpr auto quotient = 1000000000ll / NTSC_CPU_FREQUENCY;
+            last_time += std::chrono::nanoseconds(step_tick * quotient + step_tick * remainder / NTSC_CPU_FREQUENCY);
 
             // 只有在一帧结束之后才会读取对应的快捷操作
             if (frame_changed)
@@ -73,8 +77,10 @@ namespace nes
                     break;
                 }
             }
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            else
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            }
         }
     }
 
