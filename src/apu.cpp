@@ -52,9 +52,10 @@ namespace nes
         {
             4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068
         };
+        // APU周期已经对半了，所以这个数比起Wiki的(https://www.nesdev.org/wiki/APU_DMC)也要除以2
         constexpr std::array<int, 16> NTSC_DMC_TABLE = 
         {
-            428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106,  84,  72,  54
+            214, 190, 170, 160, 143, 127, 113, 107, 95, 80, 71, 64, 53, 42, 36, 27,
         };
     }
 
@@ -614,7 +615,7 @@ namespace nes
                         if (data.output >= 2)
                             data.output -= 2;
                     }
-                    data.shift_count >>= 1;
+                    data.shift_reg >>= 1;
                     data.shift_count--;
                 }
             }
