@@ -33,6 +33,7 @@ namespace nes
         //     StepPostRenderScanline();
         // else // m_scanline >= 241 && m_scanline <= 260, VerticalBlanking
         //     StepVerticalBlankingLines();
+        m_cycle++;
         m_step_coro.m_handle.resume();
     }
 
@@ -46,6 +47,7 @@ namespace nes
             {
                 m_scanline_type = PPUScanlineType::PreRender;
                 // cycle == 0
+                m_cycle = 0;
                 co_await std::suspend_always{};
 
                 // cycle == 1
@@ -84,6 +86,7 @@ namespace nes
                 for (int scanline = 0; scanline <= 239; scanline++)
                 {
                     // cycle == 0
+                    m_cycle = 0;
                     co_await std::suspend_always{};
 
                     // cycle -> [1, 256]
@@ -145,6 +148,7 @@ namespace nes
                 m_scanline_type = PPUScanlineType::PostRender;
 
                 m_device->EndPPURender();
+                m_cycle = 0;
                 for (int cycle = 0; cycle <= 339; cycle++)
                     co_await std::suspend_always{};
                 m_may_cause_NMI_conflict = true;
@@ -159,6 +163,7 @@ namespace nes
 
                 // scanline == 241 事太多，单独拿出来
                 // cycle == 0
+                m_cycle = 0;
                 m_NMI_conflict = false;
                 co_await std::suspend_always{};
 
@@ -182,6 +187,7 @@ namespace nes
                 // 剩余scanline和cycle
                 for (int scanline = 242; scanline <= 260; scanline++)
                 {
+                    m_cycle = 0;
                     for (int cycle = 0; cycle <= 340; cycle++)
                         co_await std::suspend_always{};
                 }
@@ -667,5 +673,113 @@ namespace nes
             m_palette[index & 0x0f] = value;
         else
             m_palette[index] = value;
+    }
+
+    std::vector<char> PPU::Save() const
+    {
+        std::vector<char> res(GetSaveFileSize(SAVE_VERSION));
+
+        auto pointer = res.data();
+
+        pointer = UnsafeWrite(pointer, m_open_bus);
+        pointer = UnsafeWrite(pointer, m_PPUCTRL);
+        pointer = UnsafeWrite(pointer, m_PPUMASK);
+        pointer = UnsafeWrite(pointer, m_PPUSTATUS);
+        pointer = UnsafeWrite(pointer, m_OAMADDR);
+        pointer = UnsafeWrite(pointer, m_OAMDATA);
+        pointer = UnsafeWrite(pointer, m_PPUADDR);
+        pointer = UnsafeWrite(pointer, m_palette);
+        pointer = UnsafeWrite(pointer, m_internal_register_wt);
+        pointer = UnsafeWrite(pointer, m_fine_x_scroll);
+        pointer = UnsafeWrite(pointer, m_PPUDATA_buffer);
+        pointer = UnsafeWrite(pointer, m_attribute_table);
+        pointer = UnsafeWrite(pointer, m_pattern_low);
+        pointer = UnsafeWrite(pointer, m_pattern_high);
+        pointer = UnsafeWrite(pointer, m_fetched_attribute_table);
+        pointer = UnsafeWrite(pointer, m_fetched_pattern_low);
+        pointer = UnsafeWrite(pointer, m_fetched_pattern_high);
+        pointer = UnsafeWrite(pointer, m_NMI_conflict);
+        pointer = UnsafeWrite(pointer, m_may_cause_NMI_conflict);
+        pointer = UnsafeWrite(pointer, m_scanline_type);
+        pointer = UnsafeWrite(pointer, m_primary_OAM);
+        pointer = UnsafeWrite(pointer, m_frame);
+        pointer = UnsafeWrite(pointer, m_cycle);
+        pointer = UnsafeWrite(pointer, m_mirror_type);
+        
+        pointer = UnsafeWrite(pointer, m_secondary_OAM.size());
+        for (std::size_t i = 0; i < 8; i++)
+        {
+            if (i >= m_secondary_OAM.size())
+                pointer = UnsafeWrite(pointer, 0);
+            else
+                pointer = UnsafeWrite(pointer, m_secondary_OAM[i]);
+        }
+
+        for (std::size_t i = 0; i < 0x0800; i++)
+        {
+            pointer = UnsafeWrite(pointer, m_VRAM[i]);
+        }
+
+        return res;
+    }
+
+    std::size_t PPU::GetSaveFileSize(int version) const noexcept
+    {
+        return 2422;
+    }
+
+    void PPU::Load(const std::vector<char>& data, int version)
+    {
+        if (data.size() != GetSaveFileSize(version))
+            return;
+
+        // PPU重新加载的时候需要清空一下协程
+        Reset();
+        auto pointer = data.data();
+
+        pointer = UnsafeRead(pointer, m_open_bus);
+        pointer = UnsafeRead(pointer, m_PPUCTRL);
+        pointer = UnsafeRead(pointer, m_PPUMASK);
+        pointer = UnsafeRead(pointer, m_PPUSTATUS);
+        pointer = UnsafeRead(pointer, m_OAMADDR);
+        pointer = UnsafeRead(pointer, m_OAMDATA);
+        pointer = UnsafeRead(pointer, m_PPUADDR);
+        pointer = UnsafeRead(pointer, m_palette);
+        pointer = UnsafeRead(pointer, m_internal_register_wt);
+        pointer = UnsafeRead(pointer, m_fine_x_scroll);
+        pointer = UnsafeRead(pointer, m_PPUDATA_buffer);
+        pointer = UnsafeRead(pointer, m_attribute_table);
+        pointer = UnsafeRead(pointer, m_pattern_low);
+        pointer = UnsafeRead(pointer, m_pattern_high);
+        pointer = UnsafeRead(pointer, m_fetched_attribute_table);
+        pointer = UnsafeRead(pointer, m_fetched_pattern_low);
+        pointer = UnsafeRead(pointer, m_fetched_pattern_high);
+        pointer = UnsafeRead(pointer, m_NMI_conflict);
+        pointer = UnsafeRead(pointer, m_may_cause_NMI_conflict);
+        pointer = UnsafeRead(pointer, m_scanline_type);
+        pointer = UnsafeRead(pointer, m_primary_OAM);
+        pointer = UnsafeRead(pointer, m_frame);
+        pointer = UnsafeRead(pointer, m_cycle);
+        pointer = UnsafeRead(pointer, m_mirror_type);
+        
+        std::size_t secondary_OAM_size;
+        pointer = UnsafeRead(pointer, secondary_OAM_size);
+        m_secondary_OAM.resize(secondary_OAM_size);
+        for (std::size_t i = 0; i < 8; i++)
+        {
+            if (i < secondary_OAM_size)
+                pointer = UnsafeRead(pointer, m_secondary_OAM[i]);
+            else
+                pointer += sizeof(int);
+        }
+
+        for (std::size_t i = 0; i < 0x0800; i++)
+        {
+            pointer = UnsafeRead(pointer, m_VRAM[i]);
+        }
+
+        auto cycle = m_cycle;
+        for (int c = 0; c < cycle + 1; c++)
+            Step();
     }
 }

@@ -24,6 +24,11 @@ namespace nes
         void SwitchPRGBank();
         void SwitchCHRBank();
         MirroringType GetMirroringType(std::uint8_t mirroring);
+
+        // 存档使用的函数
+        std::vector<char> Save() const override;
+        std::size_t GetSaveFileSize(int version) const noexcept override;
+        void Load(const std::vector<char>& data, int version) override;
     
     private:
         std::uint8_t m_shift_register = 0x10;

@@ -4,11 +4,13 @@
 
 namespace nes
 {
+    constexpr std::size_t CHR_RAM_SIZE = 0x2000;
+
     Mapper3::Mapper3(Cartridge* cartridge) : Mapper(cartridge)
     {
         if (cartridge->GetCHRRom().size() == 0)
         {
-            m_CHR_ram = std::make_unique<std::uint8_t[]>(0x2000);
+            m_CHR_ram = std::make_unique<std::uint8_t[]>(CHR_RAM_SIZE);
         }
     }
 
@@ -36,5 +38,43 @@ namespace nes
     void Mapper3::WritePRG(std::uint16_t address, std::uint8_t value)
     {
         m_CHR_bank = value & 0x03;
+    }
+
+    std::vector<char> Mapper3::Save() const
+    {
+        std::vector<char> res(GetSaveFileSize(SAVE_VERSION));
+
+        auto pointer = res.data();
+
+        pointer = UnsafeWrite(pointer, m_CHR_bank);
+
+        if (m_CHR_ram != nullptr)
+        {
+            for (std::size_t i = 0; i < CHR_RAM_SIZE; i++)
+                pointer = UnsafeWrite(pointer, m_CHR_ram[i]);
+        }
+
+        return res;
+    }
+
+    std::size_t Mapper3::GetSaveFileSize(int version) const noexcept
+    {
+        return 4 + (m_CHR_ram == nullptr ? 0 : CHR_RAM_SIZE);
+    }
+    
+    void Mapper3::Load(const std::vector<char>& data, int version)
+    {
+        if (data.size() != GetSaveFileSize(version))
+            return;
+        
+        auto pointer = data.data();
+
+        pointer = UnsafeRead(pointer, m_CHR_bank);
+
+        if (m_CHR_ram != nullptr)
+        {
+            for (std::size_t i = 0; i < CHR_RAM_SIZE; i++)
+                pointer = UnsafeRead(pointer, m_CHR_ram[i]);
+        }
     }
 }

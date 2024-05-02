@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <vector>
 
 namespace nes
 {
@@ -50,6 +51,11 @@ namespace nes
             if (set) m_P |= value;
             else     m_P &= ~value;
         }
+
+        // 存档使用的函数
+        std::vector<char> Save() const;
+        std::size_t GetSaveFileSize(int version) const noexcept;
+        void Load(const std::vector<char>& data, int version);
 
     private:
         std::uint16_t ReadAddress(std::uint16_t start_address);
@@ -191,7 +197,7 @@ namespace nes
         CPU6502InterruptType m_executing_interrupt_type = CPU6502InterruptType::BRK;
 
         // 总的周期数
-        std::uint32_t m_cycles = 0;
+        std::uint64_t m_cycles = 0;
 
         std::function<std::uint8_t(std::uint16_t)> m_main_bus_read;
         std::function<void(std::uint16_t, std::uint8_t)> m_main_bus_write;

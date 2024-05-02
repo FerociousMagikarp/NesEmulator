@@ -4,6 +4,8 @@
 #include <chrono>
 #include <iostream>
 #include <memory>
+#include <filesystem>
+#include <fstream>
 
 namespace nes
 {
@@ -37,6 +39,7 @@ namespace nes
             double time_s = delta_time.count() / 1000000000.0;
             int step_n = static_cast<int>(time_s * NTSC_CPU_FREQUENCY);
             last_time += std::chrono::nanoseconds(step_n * 1000000000ll / NTSC_CPU_FREQUENCY);
+            bool frame_changed = false;
             while (step_n-- > 0)
             {
                 m_PPU.Step();
@@ -44,7 +47,33 @@ namespace nes
                 m_PPU.Step();
                 m_CPU.Step();
                 m_APU.Step(); // APU自己在里面降频吧，因为三角波是CPU周期刷新的。
+
+                auto PPU_frame = m_PPU.GetFrame();
+                if (PPU_frame != m_frame)
+                {
+                    m_frame = PPU_frame;
+                    frame_changed = true;
+                }
             }
+
+            // 只有在一帧结束之后才会读取对应的快捷操作
+            if (frame_changed)
+            {
+                auto op = m_operation.exchange(EmulatorOperation::None);
+                switch (op)
+                {
+                case EmulatorOperation::None:
+                    break;
+                case EmulatorOperation::Save:
+                    Save();
+                    break;
+                case EmulatorOperation::Load:
+                    Load();
+                    m_frame = m_PPU.GetFrame();
+                    break;
+                }
+            }
+
             std::this_thread::sleep_for(std::chrono::milliseconds(2));
         }
     }
@@ -136,6 +165,118 @@ namespace nes
         default:
             break;
         }
+    }
+
+    void NesEmulator::SetOperation(EmulatorOperation operation)
+    {
+        m_operation.store(operation);
+    }
+
+    std::string NesEmulator::GetSavePath() const
+    {
+        if (!m_cartridge)
+            return "";
+        const std::string& file_name = m_cartridge->GetFileName();
+        std::filesystem::path p(file_name);
+        auto dir = p.parent_path();
+        auto name = p.filename();
+        name.replace_extension(".sav");
+        auto total = dir / name;
+        return total.string();
+    }
+
+    void NesEmulator::Save()
+    {
+        auto path = GetSavePath();
+        if (path.empty())
+            return;
+
+        std::ofstream ofs(path, std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
+        if (!ofs.is_open())
+            return;
+
+        int magic_number = SAVE_MAGIC_NUMBER;
+        ofs.write(reinterpret_cast<const char*>(&magic_number), sizeof(magic_number));
+        std::uint32_t save_version = SAVE_VERSION;
+        ofs.write(reinterpret_cast<const char*>(&save_version), sizeof(save_version));
+
+        // 保存RAM
+        ofs.write(reinterpret_cast<const char*>(m_RAM.get()), 0x0800);
+
+        // 保存CPU
+        auto CPU_data = m_CPU.Save();
+        ofs.write(CPU_data.data(), CPU_data.size());
+
+        // 保存PPU
+        auto PPU_data = m_PPU.Save();
+        ofs.write(PPU_data.data(), PPU_data.size());
+
+        // 保存Mapper
+        if (m_cartridge->GetMapper() != nullptr)
+        {
+            auto Mapper_data = m_cartridge->GetMapper()->Save();
+            ofs.write(Mapper_data.data(), Mapper_data.size());
+        }
+
+        // 保存APU
+        auto APU_data = m_APU.Save();
+        ofs.write(APU_data.data(), APU_data.size());
+
+        ofs.close();
+        std::cout << "Save success in : " << path << "\n";
+    }
+
+    void NesEmulator::Load()
+    {
+        auto path = GetSavePath();
+        if (path.empty())
+            return;
+
+        std::ifstream ifs(path, std::ios_base::in | std::ios_base::binary);
+        if (!ifs.is_open())
+            return;
+
+        do
+        {
+            int magic_number;
+            ifs.read(reinterpret_cast<char*>(&magic_number), sizeof(magic_number));
+            if (magic_number != SAVE_MAGIC_NUMBER)
+            {
+                std::cout << "Load save file error\n";
+                break;
+            }
+            std::uint32_t save_version;
+            ifs.read(reinterpret_cast<char*>(&save_version), sizeof(save_version));
+
+            // 读取RAM
+            ifs.read(reinterpret_cast<char*>(m_RAM.get()), 0x0800);
+            // 读取CPU
+            std::vector<char> data(m_CPU.GetSaveFileSize(save_version));
+            ifs.read(data.data(), data.size());
+            m_CPU.Load(data, save_version);
+
+            // 读取PPU
+            data.resize(m_PPU.GetSaveFileSize(save_version));
+            ifs.read(data.data(), data.size());
+            m_PPU.Load(data, save_version);
+
+            // 读取Mapper
+            if (m_cartridge->GetMapper() != nullptr)
+            {
+                data.resize(m_cartridge->GetMapper()->GetSaveFileSize(save_version));
+                ifs.read(data.data(), data.size());
+                m_cartridge->GetMapper()->Load(data, save_version);
+            }
+
+            // 读取APU
+            data.resize(m_APU.GetSaveFileSize(save_version));
+            ifs.read(data.data(), data.size());
+            m_APU.Load(data, save_version);
+
+            std::cout << "Load success from : " << path << "\n";
+        } while(false);
+
+        ifs.close();
     }
 
 }

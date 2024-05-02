@@ -208,19 +208,19 @@ namespace nes
                 m_noise.SetLengthCounter(val);
                 break;
             case 0x10:
-                m_DMC.SetControl(val);
+                m_DMC.data.SetControl(val);
                 break;
             case 0x11:
-                m_DMC.SetLoadCounter(val);
+                m_DMC.data.SetLoadCounter(val);
                 break;
             case 0x12:
-                m_DMC.SetSampleAddress(val);
+                m_DMC.data.SetSampleAddress(val);
                 break;
             case 0x13:
-                m_DMC.SetSampleLength(val);
+                m_DMC.data.SetSampleLength(val);
                 break;
             case 0x15:
-                m_DMC.enable = val & 0x10;
+                m_DMC.data.enable = val & 0x10;
                 m_noise.enable = val & 0x08;
                 m_triangle.enable = val & 0x04;
                 m_pulse2.enable = val & 0x02;
@@ -233,12 +233,12 @@ namespace nes
                     m_triangle.length_counter = 0;
                 if (!m_noise.enable)
                     m_noise.length_counter = 0;
-                if (!m_DMC.enable)
-                    m_DMC.cur_length = 0;
-                else if (m_DMC.cur_length == 0)
+                if (!m_DMC.data.enable)
+                    m_DMC.data.cur_length = 0;
+                else if (m_DMC.data.cur_length == 0)
                 {
-                    m_DMC.cur_address = m_DMC.sample_address;
-                    m_DMC.cur_length = m_DMC.sample_length;
+                    m_DMC.data.cur_address = m_DMC.data.sample_address;
+                    m_DMC.data.cur_length = m_DMC.data.sample_length;
                 }
                 break;
             case 0x17:
@@ -278,7 +278,7 @@ namespace nes
             result |= 0x40;
             m_frame_interrupt = false;
         }
-        result |= ((m_DMC.length_counter > 0) << 4);
+        result |= ((m_DMC.data.length_counter > 0) << 4);
         result |= (((m_noise.length_counter > 0) << 3));
         result |= (((m_triangle.length_counter > 0) << 2));
         result |= (((m_pulse2.length_counter > 0) << 1));
@@ -556,75 +556,123 @@ namespace nes
                 return envelope_volume;
         }
 
-        void DMC::SetControl(std::uint8_t val)
+        void DMCData::SetControl(std::uint8_t val)
         {
             IRQ_enable = val & 0x80;
             loop = val & 0x40;
             frequency = meta::NTSC_DMC_TABLE[val & 0x0f];
         }
 
-        void DMC::SetLoadCounter(std::uint8_t val)
+        void DMCData::SetLoadCounter(std::uint8_t val)
         {
             load_counter = val & 0x7f;
         }
 
-        void DMC::SetSampleAddress(std::uint8_t val)
+        void DMCData::SetSampleAddress(std::uint8_t val)
         {
             sample_address = 0xc000 | (static_cast<std::uint16_t>(val) << 6);
         }
 
-        void DMC::SetSampleLength(std::uint8_t val)
+        void DMCData::SetSampleLength(std::uint8_t val)
         {
             sample_length = (static_cast<std::uint16_t>(val) << 4) + 1;
         }
 
         void DMC::Step()
         {
-            if (!enable)
+            if (!data.enable)
                 return;
 
-            if (cur_length > 0 && shift_count == 0) // 需要重新读一下数据
+            if (data.cur_length > 0 && data.shift_count == 0) // 需要重新读一下数据
             {
-                shift_reg = read_callback(cur_address++);
-                shift_count = 8;
-                cur_address |= 0x8000;
-                if (--cur_length == 0 && loop)
+                data.shift_reg = read_callback(data.cur_address++);
+                data.shift_count = 8;
+                data.cur_address |= 0x8000;
+                if (--data.cur_length == 0 && data.loop)
                 {
-                    cur_address = sample_address;
-                    cur_length = sample_length;
+                    data.cur_address = data.sample_address;
+                    data.cur_length = data.sample_length;
                 }
             }
 
-            if (cur_freq > 0)
+            if (data.cur_freq > 0)
             {
-                cur_freq--;
+                data.cur_freq--;
             }
             else
             {
-                cur_freq = frequency;
-                if (shift_count > 0)
+                data.cur_freq = data.frequency;
+                if (data.shift_count > 0)
                 {
-                    if (shift_reg & 1)
+                    if (data.shift_reg & 1)
                     {
-                        if (output <= 125)
-                            output += 2;
+                        if (data.output <= 125)
+                            data.output += 2;
                     }
                     else
                     {
-                        if (output >= 2)
-                            output -= 2;
+                        if (data.output >= 2)
+                            data.output -= 2;
                     }
-                    shift_count >>= 1;
-                    shift_count--;
+                    data.shift_count >>= 1;
+                    data.shift_count--;
                 }
             }
         }
 
         std::uint8_t DMC::Output()
         {
-            if (!enable)
+            if (!data.enable)
                 return 0;
-            return output;
+            return data.output;
         }
+    }
+
+    std::vector<char> APU::Save() const
+    {
+        std::vector<char> res(GetSaveFileSize(SAVE_VERSION));
+
+        auto pointer = res.data();
+
+        pointer = UnsafeWrite(pointer, m_pulse1);
+        pointer = UnsafeWrite(pointer, m_pulse2);
+        pointer = UnsafeWrite(pointer, m_triangle);
+        pointer = UnsafeWrite(pointer, m_noise);
+        pointer = UnsafeWrite(pointer, m_DMC.data);
+        pointer = UnsafeWrite(pointer, m_cycles);
+        pointer = UnsafeWrite(pointer, m_frame_cycles);
+        pointer = UnsafeWrite(pointer, m_mode);
+        pointer = UnsafeWrite(pointer, m_interrupt);
+        pointer = UnsafeWrite(pointer, m_frame_interrupt);
+        pointer = UnsafeWrite(pointer, m_output_record);
+        pointer = UnsafeWrite(pointer, m_frame_counter);
+
+        return res;
+    }
+
+    std::size_t APU::GetSaveFileSize(int version) const noexcept
+    {
+        return 116;
+    }
+    
+    void APU::Load(const std::vector<char>& data, int version)
+    {
+        if (data.size() != GetSaveFileSize(version))
+            return;
+        
+        auto pointer = data.data();
+
+        pointer = UnsafeRead(pointer, m_pulse1);
+        pointer = UnsafeRead(pointer, m_pulse2);
+        pointer = UnsafeRead(pointer, m_triangle);
+        pointer = UnsafeRead(pointer, m_noise);
+        pointer = UnsafeRead(pointer, m_DMC.data);
+        pointer = UnsafeRead(pointer, m_cycles);
+        pointer = UnsafeRead(pointer, m_frame_cycles);
+        pointer = UnsafeRead(pointer, m_mode);
+        pointer = UnsafeRead(pointer, m_interrupt);
+        pointer = UnsafeRead(pointer, m_frame_interrupt);
+        pointer = UnsafeRead(pointer, m_output_record);
+        pointer = UnsafeRead(pointer, m_frame_counter);
     }
 }

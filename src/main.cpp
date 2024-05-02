@@ -22,6 +22,12 @@ void SetInputControlConfig(SDLApplication& app, const nes::InputConfig config, n
     app.SetControl(config.TurboB, nes::InputKey::TurboB, player);
 }
 
+void SetFunctionControlConfig(SDLApplication& app, const nes::FuncConfig& config, std::shared_ptr<nes::NesEmulator> emulator)
+{
+    app.SetControl(config.Save, [emulator]()->void { emulator->SetOperation(nes::EmulatorOperation::Save); });
+    app.SetControl(config.Load, [emulator]()->void { emulator->SetOperation(nes::EmulatorOperation::Load); });
+}
+
 int main(int argc, char *argv[])
 {
     if (!CommandLine::GetInstance().Init(argc, argv))
@@ -42,7 +48,7 @@ int main(int argc, char *argv[])
     }
 
     std::shared_ptr<nes::VirtualDevice> device = std::make_shared<nes::VirtualDevice>();
-    std::unique_ptr<nes::NesEmulator> nes_emulator = std::make_unique<nes::NesEmulator>();
+    std::shared_ptr<nes::NesEmulator> nes_emulator = std::make_shared<nes::NesEmulator>();
     // 命令行配置参数设置
     CommandLine::GetInstance().Execute(nes_emulator, device);
     
@@ -59,6 +65,7 @@ int main(int argc, char *argv[])
     application.SetVirtualDevice(device);
     SetInputControlConfig(application, config.Player1, nes::Player::Player1);
     SetInputControlConfig(application, config.Player2, nes::Player::Player2);
+    SetFunctionControlConfig(application, config.ShortcutKeys, nes_emulator);
 
     bool running = true;
 

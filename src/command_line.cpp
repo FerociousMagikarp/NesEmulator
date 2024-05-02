@@ -66,7 +66,7 @@ bool CommandLine::Init(int argc, char **argv)
     return true;
 }
 
-void CommandLine::Execute(const std::unique_ptr<nes::NesEmulator>& emulator, const std::shared_ptr<nes::VirtualDevice>& device)
+void CommandLine::Execute(const std::shared_ptr<nes::NesEmulator>& emulator, const std::shared_ptr<nes::VirtualDevice>& device)
 {
     // 先暂时这么写，之后如果命令多了就重构
     for (auto iter = m_commands.cbegin(); iter != m_commands.cend(); ++iter)

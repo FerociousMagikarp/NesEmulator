@@ -3,15 +3,22 @@
 #include "cpu.h"
 #include "ppu.h"
 #include "apu.h"
-#include <cstdint>
 #include <memory>
 #include <chrono>
+#include <atomic>
 #include "cartridge.h"
 #include "virtual_device.h"
 
 namespace nes
 {
     class Cartridge;
+
+    enum class EmulatorOperation
+    {
+        None,
+        Save,
+        Load,
+    };
 
     class NesEmulator
     {
@@ -29,9 +36,16 @@ namespace nes
             m_APU.SetDevice(device);
         }
 
+        void SetOperation(EmulatorOperation operation);
+
     private:
         std::uint8_t MainBusRead(std::uint16_t address);
         void MainBusWrite(std::uint16_t address, std::uint8_t value);
+
+        std::string GetSavePath() const;
+
+        void Save();
+        void Load();
 
     private:
         std::unique_ptr<Cartridge> m_cartridge = nullptr;
@@ -39,8 +53,12 @@ namespace nes
 
         std::shared_ptr<VirtualDevice> m_device = nullptr;
 
+        std::atomic<EmulatorOperation> m_operation = EmulatorOperation::None;
+
         CPU6502 m_CPU;
         PPU     m_PPU;
         APU     m_APU;
+
+        std::uint64_t m_frame = 0;
     };
 }

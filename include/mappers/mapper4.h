@@ -3,6 +3,7 @@
 #include "mappers/mapper.h"
 #include <cstdint>
 #include <memory>
+#include <array>
 
 namespace nes
 {
@@ -23,6 +24,11 @@ namespace nes
         void SetTriggerIRQCallback(std::function<void(void)>&& callback) override { m_trigger_IRQ = std::move(callback); }
         void BankSelect(std::uint8_t val);
 
+        // 存档使用的函数
+        std::vector<char> Save() const override;
+        std::size_t GetSaveFileSize(int version) const noexcept override;
+        void Load(const std::vector<char>& data, int version) override;
+
     private:
         std::unique_ptr<std::uint8_t[]> m_CHR_ram = nullptr;
         std::uint8_t m_bank_select = 0;
@@ -30,8 +36,8 @@ namespace nes
         int m_IRQ_latch = 0;
         int m_IRQ_counter = 0;
 
-        std::uint32_t m_PRG_bank[4] = { 0 };
-        std::uint32_t m_CHR_bank[8] = { 0 };
+        std::array<std::uint32_t, 4> m_PRG_bank{};
+        std::array<std::uint32_t, 8> m_CHR_bank{};
 
         std::function<void(void)> m_trigger_IRQ;
     };

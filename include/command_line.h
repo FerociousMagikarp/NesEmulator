@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <variant>
 
+// TODO : 等着把这个文件删了
+
 namespace nes
 {
     class NesEmulator;
@@ -27,7 +29,7 @@ public:
     ~CommandLine() = default;
 
     bool Init(int argc, char** argv);
-    void Execute(const std::unique_ptr<nes::NesEmulator>& emulator, const std::shared_ptr<nes::VirtualDevice>& device);
+    void Execute(const std::shared_ptr<nes::NesEmulator>& emulator, const std::shared_ptr<nes::VirtualDevice>& device);
     inline const std::string& GetError() const { return m_error; }
     inline const std::string& GetNesPath() const { return m_nes_path; }
 

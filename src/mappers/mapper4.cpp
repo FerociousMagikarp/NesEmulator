@@ -4,10 +4,12 @@
 
 namespace nes
 {
+    constexpr std::size_t CHR_RAM_SIZE = 0x2000;
+
     Mapper4::Mapper4(Cartridge* cartridge) : Mapper(cartridge)
     {
         if (cartridge->GetCHRRom().empty())
-            m_CHR_ram = std::make_unique<std::uint8_t[]>(0x2000);
+            m_CHR_ram = std::make_unique<std::uint8_t[]>(CHR_RAM_SIZE);
         m_PRG_bank[3] = static_cast<std::uint32_t>(cartridge->GetPRGRom().size()) - 0x2000;
         m_CHR_bank[0] = 0;
         m_CHR_bank[1] = 0x400;
@@ -154,6 +156,54 @@ namespace nes
             case 7: // R7: Select 8 KB PRG ROM bank at $A000-$BFFF
                 m_PRG_bank[1] = static_cast<std::uint32_t>(val & 0x3f) % (static_cast<std::uint32_t>(m_cartridge->GetPRGRom().size()) >> 13) << 13;
                 break;
+        }
+    }
+
+    std::vector<char> Mapper4::Save() const
+    {
+        std::vector<char> res(GetSaveFileSize(SAVE_VERSION));
+
+        auto pointer = res.data();
+
+        pointer = UnsafeWrite(pointer, m_bank_select);
+        pointer = UnsafeWrite(pointer, m_IRQ_enabled);
+        pointer = UnsafeWrite(pointer, m_IRQ_latch);
+        pointer = UnsafeWrite(pointer, m_IRQ_counter);
+        pointer = UnsafeWrite(pointer, m_PRG_bank);
+        pointer = UnsafeWrite(pointer, m_CHR_bank);
+
+        if (m_CHR_ram != nullptr)
+        {
+            for (std::size_t i = 0; i < CHR_RAM_SIZE; i++)
+                pointer = UnsafeWrite(pointer, m_CHR_ram[i]);
+        }
+
+        return res;
+    }
+
+    std::size_t Mapper4::GetSaveFileSize(int version) const noexcept
+    {
+        return 60 + (m_CHR_ram == nullptr ? 0 : CHR_RAM_SIZE);
+    }
+    
+    void Mapper4::Load(const std::vector<char>& data, int version)
+    {
+        if (data.size() != GetSaveFileSize(version))
+            return;
+        
+        auto pointer = data.data();
+
+        pointer = UnsafeRead(pointer, m_bank_select);
+        pointer = UnsafeRead(pointer, m_IRQ_enabled);
+        pointer = UnsafeRead(pointer, m_IRQ_latch);
+        pointer = UnsafeRead(pointer, m_IRQ_counter);
+        pointer = UnsafeRead(pointer, m_PRG_bank);
+        pointer = UnsafeRead(pointer, m_CHR_bank);
+
+        if (m_CHR_ram != nullptr)
+        {
+            for (std::size_t i = 0; i < CHR_RAM_SIZE; i++)
+                pointer = UnsafeRead(pointer, m_CHR_ram[i]);
         }
     }
 }

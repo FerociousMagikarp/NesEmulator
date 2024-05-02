@@ -37,6 +37,10 @@ namespace nes
     constexpr int NTSC_CPU_FREQUENCY = 1789773;
     constexpr int NTSC_FRAME_FREQUENCY = 240;
 
+    // 存档文件用的魔法数 (其实这个数使用numpy随机生成的)
+    constexpr int SAVE_MAGIC_NUMBER = 1098186332;
+    constexpr int SAVE_VERSION = 0;
+
     struct InputConfig
     {
         KeyCode A;
@@ -52,10 +56,39 @@ namespace nes
         KeyCode TurboB;
     };
 
+    struct FuncConfig
+    {
+        KeyCode Save;
+        KeyCode Load;
+    };
+
     struct Config
     {
         using enum KeyCode;
         InputConfig Player1 = {K, J, Semicolon, Return, W, S, A, D, I, U};
         InputConfig Player2 = {KPPeriod, KP0, KPPlus, KPEnter, Up, Down, Left, Right, KP2, KP1};
+        FuncConfig  ShortcutKeys = { Comma, Period };
     };
+
+    // 保存数据的时候用的，如果之后有大小端问题可以在这里处理
+    template <typename T>
+    inline char* UnsafeWrite(char* pointer, T&& val)
+    {
+        using type = std::decay_t<T>;
+        auto p = reinterpret_cast<type*>(pointer);
+        *p = val;
+        p++;
+        return reinterpret_cast<char*>(p);
+    }
+
+    // 读取数据的时候用的
+    template <typename T>
+    inline const char* UnsafeRead(const char* pointer, T& val)
+    {
+        using type = std::decay_t<T>;
+        auto p = reinterpret_cast<const type*>(pointer);
+        val = *p;
+        p++;
+        return reinterpret_cast<const char*>(p);
+    }
 }

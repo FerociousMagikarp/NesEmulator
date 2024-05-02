@@ -3,6 +3,7 @@
 #include "cpu_instructions.h"
 #include <iostream>
 #include <type_traits>
+#include "def.h"
 
 namespace nes
 {
@@ -770,5 +771,53 @@ namespace nes
         m_A = static_cast<std::uint8_t>(tmp & 0xff);
 
         return src;
+    }
+
+    std::vector<char> CPU6502::Save() const
+    {
+        std::vector<char> res(GetSaveFileSize(SAVE_VERSION));
+
+        auto pointer = res.data();
+
+        pointer = UnsafeWrite(pointer, m_PC);
+        pointer = UnsafeWrite(pointer, m_SP);
+        pointer = UnsafeWrite(pointer, m_P);
+        pointer = UnsafeWrite(pointer, m_A);
+        pointer = UnsafeWrite(pointer, m_X);
+        pointer = UnsafeWrite(pointer, m_Y);
+        pointer = UnsafeWrite(pointer, m_current_interrupt);
+        pointer = UnsafeWrite(pointer, m_skip_cycles);
+        pointer = UnsafeWrite(pointer, m_cross_page);
+        pointer = UnsafeWrite(pointer, m_is_executing_interrupt);
+        pointer = UnsafeWrite(pointer, m_executing_interrupt_type);
+        pointer = UnsafeWrite(pointer, m_cycles);
+
+        return res;
+    }
+
+    std::size_t CPU6502::GetSaveFileSize(int version) const noexcept
+    {
+        return 24;
+    }
+    
+    void CPU6502::Load(const std::vector<char>& data, int version)
+    {
+        if (data.size() != GetSaveFileSize(version))
+            return;
+        
+        auto pointer = data.data();
+
+        pointer = UnsafeRead(pointer, m_PC);
+        pointer = UnsafeRead(pointer, m_SP);
+        pointer = UnsafeRead(pointer, m_P);
+        pointer = UnsafeRead(pointer, m_A);
+        pointer = UnsafeRead(pointer, m_X);
+        pointer = UnsafeRead(pointer, m_Y);
+        pointer = UnsafeRead(pointer, m_current_interrupt);
+        pointer = UnsafeRead(pointer, m_skip_cycles);
+        pointer = UnsafeRead(pointer, m_cross_page);
+        pointer = UnsafeRead(pointer, m_is_executing_interrupt);
+        pointer = UnsafeRead(pointer, m_executing_interrupt_type);
+        pointer = UnsafeRead(pointer, m_cycles);
     }
 }

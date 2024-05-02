@@ -24,6 +24,11 @@ namespace nes
         virtual void SetTriggerIRQCallback(std::function<void(void)>&& callback) {}
         virtual void ReduceIRQCounter() {}
 
+        // 存档使用的函数
+        virtual std::vector<char> Save() const = 0;
+        virtual std::size_t GetSaveFileSize(int version) const noexcept = 0;
+        virtual void Load(const std::vector<char>& data, int version) = 0;
+
     protected:
         Cartridge* m_cartridge;
         std::function<void(MirroringType)> m_on_morroring_changed;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstdint>
+#include <string>
 #include <memory>
 #include <vector>
 
@@ -29,7 +29,9 @@ namespace nes
             if (m_PRG_Ram) m_PRG_Ram[address] = value;
         }
 
-        inline bool IsMirroringVertical() const { return m_special_flags | MirroringVertical; }
+        inline bool IsMirroringVertical() const noexcept { return m_special_flags | MirroringVertical; }
+
+        inline const std::string& GetFileName() const noexcept { return m_file_name; }
 
     private:
         bool CreateMapper();
@@ -56,5 +58,7 @@ namespace nes
         std::unique_ptr<std::uint8_t[]> m_PRG_Ram = nullptr;
         std::vector<std::uint8_t> m_PRG_Rom;
         std::vector<std::uint8_t> m_CHR_Rom;
+
+        std::string m_file_name = "";
     };
 }

@@ -65,6 +65,13 @@ namespace nes
 
         void OAMDMA(std::uint8_t* data);
 
+        inline auto GetFrame() const noexcept { return m_frame; }
+
+        // 存档使用的函数
+        std::vector<char> Save() const;
+        std::size_t GetSaveFileSize(int version) const noexcept;
+        void Load(const std::vector<char>& data, int version);
+
     private:
         std::uint8_t PPUBusRead(std::uint16_t address);
         void PPUBusWrite(std::uint16_t address, std::uint8_t value);
@@ -140,7 +147,7 @@ namespace nes
         std::uint8_t m_OAMDATA = 0;
         std::uint16_t m_PPUADDR = 0; // 写两次
 
-        std::uint8_t m_palette[0x20] = { 0 };
+        std::array<std::uint8_t, 0x20> m_palette{};
 
         // w一位，v15位，合并一下，这个寄存器的t位在这里是m_PPUADDR
         std::uint16_t m_internal_register_wt = 0;
@@ -162,16 +169,17 @@ namespace nes
         bool m_may_cause_NMI_conflict = false;
         bool m_has_trigger_NMI = false;
 
+        int m_cycle = 0;
+
         PPUScanlineType m_scanline_type = PPUScanlineType::PreRender;
+        MirroringType m_mirror_type = MirroringType::Horizontal;
 
         std::array<std::uint8_t, 64 * 4> m_primary_OAM;
         // 单纯存一下m_primary_OAM的坐标
         std::vector<int> m_secondary_OAM;
 
         PPUCycleCoro m_step_coro;
-        unsigned int m_frame = 0;
-
-        MirroringType m_mirror_type = MirroringType::Horizontal;
+        std::uint64_t m_frame = 0;
 
         std::function<std::uint8_t(std::uint16_t)> m_mapper_read_CHR;
         std::function<void(std::uint16_t, std::uint8_t)> m_mapper_write_CHR;

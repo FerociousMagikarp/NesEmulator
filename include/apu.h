@@ -93,15 +93,12 @@ namespace nes
             std::uint8_t cur_time = 0;
         };
 
-        struct DMC : public Channel
+        struct DMCData : public Channel
         {
             void SetControl(std::uint8_t val);
             void SetLoadCounter(std::uint8_t val);
             void SetSampleAddress(std::uint8_t val);
             void SetSampleLength(std::uint8_t val);
-
-            void Step();
-            std::uint8_t Output();
 
             bool IRQ_enable = false;
             bool loop = false;
@@ -115,7 +112,15 @@ namespace nes
             std::uint8_t shift_reg = 0;
             std::uint8_t shift_count = 0;
             std::uint8_t output = 0;
-            
+        };
+
+        struct DMC
+        {
+            void Step();
+            std::uint8_t Output();
+
+            DMCData data;
+
             std::function<std::uint8_t(std::uint16_t)> read_callback;
         };
     }
@@ -137,6 +142,11 @@ namespace nes
             // 本来硬件上APU和CPU在一块的，但是写的时候分开了，所以中断只能回调了，无奈出此下策
             inline void SetIRQCallback(std::function<void()>&& callback) { m_trigger_IRQ = std::move(callback); }
             inline void SetDMCReadCallback(std::function<std::uint8_t(std::uint16_t)>&& callback) { m_DMC.read_callback = std::move(callback); }
+
+            // 存档使用的函数
+            std::vector<char> Save() const;
+            std::size_t GetSaveFileSize(int version) const noexcept;
+            void Load(const std::vector<char>& data, int version);
 
         private:
             std::function<void()> m_trigger_IRQ;

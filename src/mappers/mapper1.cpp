@@ -5,6 +5,8 @@
 
 namespace nes
 {
+    constexpr std::size_t CHR_RAM_SIZE = 0x2000;
+
     Mapper1::Mapper1(Cartridge* cartridge) : Mapper(cartridge)
     {
         m_first_bank_PRG = 0x0000;
@@ -12,7 +14,7 @@ namespace nes
         m_CHR_bank_low = 0x0000;
         m_CHR_bank_high = 0x1000;
         if (cartridge->GetCHRRom().empty())
-            m_CHR_Ram = std::make_unique<std::uint8_t[]>(0x2000);
+            m_CHR_Ram = std::make_unique<std::uint8_t[]>(CHR_RAM_SIZE);
     }
 
     std::uint8_t Mapper1::ReadCHR(std::uint16_t address)
@@ -145,5 +147,59 @@ namespace nes
                 break;
         }
         return MirroringType::Horizontal; // 不会有这种情况
+    }
+
+    std::vector<char> Mapper1::Save() const
+    {
+        std::vector<char> res(GetSaveFileSize(SAVE_VERSION));
+        auto pointer = res.data();
+
+        pointer = UnsafeWrite(pointer, m_shift_register);
+        pointer = UnsafeWrite(pointer, m_control);
+        pointer = UnsafeWrite(pointer, m_CHR_bank0);
+        pointer = UnsafeWrite(pointer, m_CHR_bank1);
+        pointer = UnsafeWrite(pointer, m_PRG_bank);
+        pointer = UnsafeWrite(pointer, m_first_bank_PRG);
+        pointer = UnsafeWrite(pointer, m_last_bank_PRG);
+        pointer = UnsafeWrite(pointer, m_CHR_bank_low);
+        pointer = UnsafeWrite(pointer, m_CHR_bank_high);
+
+        if (m_CHR_Ram != nullptr)
+        {
+            for (std::size_t i = 0; i < CHR_RAM_SIZE; i++)
+                pointer = UnsafeWrite(pointer, m_CHR_Ram[i]);
+        }
+
+        return res;
+    }
+
+    std::size_t Mapper1::GetSaveFileSize(int version) const noexcept
+    {
+        return 68 + (m_CHR_Ram != nullptr ? CHR_RAM_SIZE : 0);
+    }
+
+    void Mapper1::Load(const std::vector<char>& data, int version)
+    {
+        if (data.size() != GetSaveFileSize(version))
+            return;
+        
+        auto pointer = data.data();
+
+        pointer = UnsafeRead(pointer, m_shift_register);
+        pointer = UnsafeRead(pointer, m_control);
+        pointer = UnsafeRead(pointer, m_CHR_bank0);
+        pointer = UnsafeRead(pointer, m_CHR_bank1);
+        pointer = UnsafeRead(pointer, m_PRG_bank);
+        pointer = UnsafeRead(pointer, m_PRG_bank);
+        pointer = UnsafeRead(pointer, m_first_bank_PRG);
+        pointer = UnsafeRead(pointer, m_last_bank_PRG);
+        pointer = UnsafeRead(pointer, m_CHR_bank_low);
+        pointer = UnsafeRead(pointer, m_CHR_bank_high);
+
+        if (m_CHR_Ram != nullptr)
+        {
+            for (std::size_t i = 0; i < CHR_RAM_SIZE; i++)
+                pointer = UnsafeRead(pointer, m_CHR_Ram[i]);
+        }
     }
 }

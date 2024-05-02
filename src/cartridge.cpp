@@ -1,11 +1,8 @@
 #include "cartridge.h"
 #include <array>
-#include <cstdint>
 #include <fstream>
-#include <ios>
 #include <iostream>
 #include <memory>
-#include <stdio.h>
 #include "mappers/mapper_headers.h"
 
 
@@ -26,6 +23,8 @@ namespace nes
 
     bool Cartridge::LoadFromFile(const char* path)
     {
+        m_file_name = path;
+
         std::ifstream ifstream;
         ifstream.open(path, std::ios::in | std::ios::binary);
 
