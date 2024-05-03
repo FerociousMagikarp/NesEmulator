@@ -49,6 +49,8 @@ namespace nes
                 m_CPU.Step();
                 m_APU.Step(); // APU自己在里面降频吧，因为三角波是CPU周期刷新的。
 
+                m_cartridge->GetMapper()->CPUCycleCounter();
+
                 auto PPU_frame = m_PPU.GetFrame();
                 if (PPU_frame != m_frame)
                 {

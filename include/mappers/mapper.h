@@ -23,6 +23,7 @@ namespace nes
         void OnMirroringChanged(std::function<void(MirroringType)>&& callback) { m_on_morroring_changed = std::move(callback); }
         virtual void SetTriggerIRQCallback(std::function<void(void)>&& callback) {}
         virtual void ReduceIRQCounter() {}
+        virtual void CPUCycleCounter() {}
 
         // 存档使用的函数
         virtual std::vector<char> Save() const = 0;
