@@ -241,10 +241,10 @@ void SDLApplication::Run(bool &running)
                 break;
             }
         }
-
         if (running == false)
             break;
 
+        m_device->ApplicationTurboTick();
         m_device->ApplicationUpdate();
         SDL_RenderClear(m_renderer);
         SDL_RenderCopy(m_renderer, m_texture, nullptr, nullptr);

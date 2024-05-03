@@ -27,22 +27,27 @@ namespace nes
         return m_keyboard[static_cast<int>(player)][static_cast<int>(key)];
     }
 
-    void VirtualDevice::TurboTick()
+    void VirtualDevice::ApplicationTurboTick()
     {
         using enum Player;
         using enum InputKey;
 
         // 如果没有按下连发键就不需要更新时间了
-        if (!(IsKeyDown(Player1, TurboA) || IsKeyDown(Player1, TurboB) || IsKeyDown(Player2, TurboA) || IsKeyDown(Player2, TurboB)))
-            return;
-
-        auto now = std::chrono::steady_clock::now();
-        auto delta_time = now - m_turbo_time;
-        if (delta_time.count() / 1000000 >= m_turbo_time_interval_ms / 2)
+        if (IsKeyDown(Player1, TurboA) || IsKeyDown(Player1, TurboB) || IsKeyDown(Player2, TurboA) || IsKeyDown(Player2, TurboB))
         {
-            m_is_turbo = !m_is_turbo;
-            m_turbo_time = now;
+            auto now = std::chrono::steady_clock::now();
+            auto delta_time = now - m_turbo_time;
+            if (delta_time.count() / 1000000 >= m_turbo_time_interval_ms)
+            {
+                m_is_turbo = !m_is_turbo;
+                m_turbo_time = now;
+            }
         }
+
+        // 这个活放到 application 线程来干
+        auto c1 = GetNesKey(Player::Player1);
+        auto c2 = GetNesKey(Player::Player2);
+        m_controllers.store(static_cast<std::uint16_t>(c1) << 8 | c2);
     }
 
     std::uint8_t VirtualDevice::GetNesKey(Player player) const
@@ -64,11 +69,6 @@ namespace nes
 
     void VirtualDevice::StartPPURender()
     {
-        // 每次PPU刷新帧开始的时候把按键更新了
-        auto c1 = GetNesKey(Player::Player1);
-        auto c2 = GetNesKey(Player::Player2);
-        m_controllers = static_cast<std::uint16_t>(c1) << 8 | c2;
-        TurboTick();
     }
 
     void VirtualDevice::EndPPURender()
@@ -115,7 +115,7 @@ namespace nes
         m_strobe = val & 0x7; // 就后三位有用，虽然目前只用最后一位
         if ((m_strobe & 0x01) == 0) // 最后一位空了就开始读
         {
-            std::uint16_t input = m_controllers;
+            std::uint16_t input = m_controllers.load();
             m_shift_controller1 = static_cast<std::uint8_t>(input >> 8);
             m_shift_controller2 = static_cast<std::uint8_t>(input & 0xff);
         }
@@ -126,7 +126,7 @@ namespace nes
         std::uint8_t res = 0;
         if ((m_strobe & 0x01) != 0)
         {
-            std::uint16_t current_input = m_controllers;
+            std::uint16_t current_input = m_controllers.load();
             res = static_cast<std::uint8_t>(current_input >> 8) & 0x01;
         }
         else
@@ -142,7 +142,7 @@ namespace nes
         std::uint8_t res = 0;
         if ((m_strobe & 0x01) != 0)
         {
-            std::uint16_t current_input = m_controllers;
+            std::uint16_t current_input = m_controllers.load();
             res = static_cast<std::uint8_t>(current_input & 0xff) & 0x01;
         }
         else

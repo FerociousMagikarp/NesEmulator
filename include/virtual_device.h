@@ -30,6 +30,7 @@ namespace nes
             void ApplicationUpdate();
             void ApplicationKeyDown(Player player, InputKey key);
             void ApplicationKeyUp(Player player, InputKey key);
+            void ApplicationTurboTick();
 
             void StartPPURender();
             void EndPPURender();
@@ -48,7 +49,6 @@ namespace nes
             void SetPixel(int x, int y, int palette_index);
             
         private:
-            void TurboTick();
             std::uint8_t GetNesKey(Player player) const;
             bool IsKeyDown(Player player, InputKey key) const;
 
@@ -56,7 +56,7 @@ namespace nes
 
             // 两个手柄按键放一块了，先1再2
             // 顺序 ： → ← ↓ ↑ Start Select B A
-            std::uint16_t m_controllers = 0;
+            std::atomic<std::uint16_t> m_controllers = 0;
             std::uint8_t m_shift_controller1 = 0;
             std::uint8_t m_shift_controller2 = 0;
 
@@ -76,7 +76,7 @@ namespace nes
             std::array<std::array<bool, 10>, 2> m_keyboard{};
             bool m_is_turbo = false;
 
-            std::uint64_t m_turbo_time_interval_ms = 48;
+            std::uint64_t m_turbo_time_interval_ms = 20;
             std::chrono::steady_clock::time_point m_turbo_time{};
 
             struct AudioSamples
