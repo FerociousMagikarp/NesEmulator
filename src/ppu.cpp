@@ -64,6 +64,8 @@ namespace nes
                         m_PPUADDR &= ~0x7be0;
                         m_PPUADDR |= m_internal_register_wt & 0x7be0;
                     }
+                    if (cycle == 260 && (IsShowBackgroundEnabled() || IsShowSpriteEnabled()))
+                        m_mapper_reduce_IRQ_counter();
                     co_await std::suspend_always{};
                 }
 
