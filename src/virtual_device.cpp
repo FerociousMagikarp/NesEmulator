@@ -7,10 +7,9 @@ namespace nes
 {
     void VirtualDevice::ApplicationUpdate()
     {
-        std::unique_lock<std::mutex> lock(m_mutex);
-        while (!m_can_app_update)
-            m_cond.wait(lock);
+        m_write_screen_finish.wait(false);
         m_app_update_callback();
+        m_write_screen_finish.store(false);
     }
 
     void VirtualDevice::ApplicationKeyDown(Player player, InputKey key)
@@ -65,12 +64,6 @@ namespace nes
 
     void VirtualDevice::StartPPURender()
     {
-        while (m_can_app_update)
-        {
-            std::lock_guard<std::mutex> lock(m_mutex);
-            m_can_app_update = false;
-        }
-
         // 每次PPU刷新帧开始的时候把按键更新了
         auto c1 = GetNesKey(Player::Player1);
         auto c2 = GetNesKey(Player::Player2);
@@ -80,12 +73,8 @@ namespace nes
 
     void VirtualDevice::EndPPURender()
     {
-        while (!m_can_app_update)
-        {
-            std::lock_guard<std::mutex> lock(m_mutex);
-            m_can_app_update = true;
-        }
-        m_cond.notify_one();
+        m_write_screen_finish.store(true);
+        m_write_screen_finish.notify_one();
     }
 
     void VirtualDevice::FillAudioSamples(unsigned char* stream, int len)

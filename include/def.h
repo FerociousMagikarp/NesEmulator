@@ -4,6 +4,9 @@
 
 namespace nes
 {
+    constexpr int NES_WIDTH  = 256;
+    constexpr int NES_HEIGHT = 240;
+
     enum class MirroringType
     {
         Horizontal,

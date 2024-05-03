@@ -3,6 +3,7 @@
 #include "ppu.h"
 #include <chrono>
 #include <iostream>
+#include <thread>
 #include <memory>
 #include <filesystem>
 #include <fstream>

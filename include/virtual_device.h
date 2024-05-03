@@ -1,7 +1,6 @@
 #pragma once
 
-#include <condition_variable>
-#include <cstdint>
+#include <atomic>
 #include <memory>
 #include <mutex>
 #include <functional>
@@ -11,13 +10,10 @@
 
 namespace nes
 {
-    constexpr int NES_WIDTH  = 256;
-    constexpr int NES_HEIGHT = 240;
-
     class VirtualDevice
     {
         public:
-            VirtualDevice() : m_screen(std::make_unique<std::uint8_t[]>(NES_WIDTH * NES_HEIGHT * 4)) {}
+            VirtualDevice() = default;
             ~VirtualDevice() = default;
 
             inline const int GetWidth() const noexcept { return NES_WIDTH * m_scale; }
@@ -28,7 +24,7 @@ namespace nes
             inline void SetTurboTimeIntervalMs(std::uint64_t val) noexcept { m_turbo_time_interval_ms = val; }
             inline std::uint64_t GetTurboTimeIntervalMs() const noexcept { return m_turbo_time_interval_ms; }
 
-            inline std::uint8_t* GetScreenPointer() const noexcept { return m_screen.get(); }
+            inline const std::uint8_t* GetScreenPointer() const noexcept { return m_screen.data(); }
             inline void SetApplicationUpdateCallback(std::function<void(void)>&& callback) { m_app_update_callback = std::move(callback); }
 
             void ApplicationUpdate();
@@ -64,18 +60,16 @@ namespace nes
             std::uint8_t m_shift_controller1 = 0;
             std::uint8_t m_shift_controller2 = 0;
 
-            std::unique_ptr<std::uint8_t[]> m_screen;
+            std::array<std::uint8_t, NES_WIDTH * NES_HEIGHT * 4> m_screen;
 
-            // 读取和写入屏幕信息的时候都要加锁，控制器信息也是
-            std::mutex m_mutex;
-            std::condition_variable m_cond;
+            // 读取和写入时的锁
+            std::atomic<bool> m_write_screen_finish = false;
 
             // 操作音频buffer的时候加的锁
             std::mutex m_audio_mutex;
 
             std::function<void(void)> m_app_update_callback;
 
-            bool m_can_app_update = false;
             std::uint8_t m_strobe = 0;
 
             // 两个player，10种按键（包括连发），先这么写

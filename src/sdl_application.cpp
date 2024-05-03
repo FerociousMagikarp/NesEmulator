@@ -213,7 +213,7 @@ void SDLApplication::Run(bool &running)
             {
             case SDL_QUIT:
                 running = false;
-                return;
+                break;
             case SDL_KEYDOWN:
                 if (auto iter = m_keyboard_map.find(event.key.keysym.sym); iter != m_keyboard_map.end())
                 {
@@ -242,12 +242,18 @@ void SDLApplication::Run(bool &running)
             }
         }
 
+        if (running == false)
+            break;
+
         m_device->ApplicationUpdate();
         SDL_RenderClear(m_renderer);
         SDL_RenderCopy(m_renderer, m_texture, nullptr, nullptr);
         SDL_RenderPresent(m_renderer);
     }
     SDL_CloseAudio();
+    SDL_DestroyRenderer(m_renderer);
+    SDL_DestroyTexture(m_texture);
+    SDL_DestroyWindow(m_window);
 }
 
 void SDLApplication::FillAudioBuffer(unsigned char* stream, int len)
