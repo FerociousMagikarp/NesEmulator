@@ -478,7 +478,7 @@ namespace nes
 
         std::uint8_t Triangle::Output()
         {
-            if (!enable || counter_value == 0 || length_counter == 0)
+            if (!enable || counter_value == 0 || length_counter == 0 || cur_time < 2)
                 return 0;
             return meta::TRIANGLE_DUTY_TABLE[cur_duty];
         }
