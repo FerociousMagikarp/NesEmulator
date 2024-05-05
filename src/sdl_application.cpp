@@ -3,7 +3,7 @@
 #include "def.h"
 #include "virtual_device.h"
 #include <chrono>
-#include <cstdint>
+#include <iostream>
 
 const std::unordered_map<nes::KeyCode, SDL_KeyCode> KEY_CODE_MAP = 
 {
@@ -136,6 +136,23 @@ const std::unordered_map<nes::KeyCode, SDL_KeyCode> KEY_CODE_MAP =
     {nes::KeyCode::Power,        SDLK_POWER       },
 };
 
+// 手柄按键枚举
+enum class JoystickXBoxButton
+{
+    A,
+    B,
+    X,
+    Y,
+    LB,
+    RB,
+    View,
+    Menu,
+    L,
+    R,
+};
+
+constexpr int JOYSTICK_DEAD_ZONE = 10;
+
 SDLApplication::~SDLApplication()
 {
     SDL_DestroyTexture(m_texture);
@@ -146,7 +163,7 @@ SDLApplication::~SDLApplication()
 
 bool SDLApplication::Init(int width, int height)
 {
-    if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0)
+    if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_JOYSTICK) != 0)
         return false;
     m_window = SDL_CreateWindow("NesEmulator", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_SHOWN);
     m_renderer = SDL_CreateRenderer(m_window, -1, SDL_RENDERER_ACCELERATED);
@@ -170,6 +187,20 @@ bool SDLApplication::Init(int width, int height)
     if (SDL_OpenAudio(&spec, nullptr) == 0)
     {
         SDL_PauseAudio(0);
+    }
+
+    // 初始化手柄
+    if (int joysticks_num = SDL_NumJoysticks(); joysticks_num > 0)
+    {
+        m_joysticks[0].joy = SDL_JoystickOpen(0);
+        m_joysticks[0].player = nes::Player::Player1;
+        m_joysticks[0].id = 0;
+        if (joysticks_num > 1)
+        {
+            m_joysticks[1].joy = SDL_JoystickOpen(1);
+            m_joysticks[1].player = nes::Player::Player2;
+            m_joysticks[1].id = 1;
+        }
     }
 
     return true;
@@ -213,7 +244,7 @@ void SDLApplication::Run(bool &running)
             {
             case SDL_QUIT:
                 running = false;
-                break;
+                return;
             case SDL_KEYDOWN:
                 if (auto iter = m_keyboard_map.find(event.key.keysym.sym); iter != m_keyboard_map.end())
                 {
@@ -237,23 +268,41 @@ void SDLApplication::Run(bool &running)
                     }
                 }
                 break;
+            case SDL_JOYAXISMOTION:
+                SDLJoystickAxis(event.jbutton.which, static_cast<int>(event.jaxis.axis), static_cast<int>(event.jaxis.value));
+                break;
+            case SDL_JOYBUTTONDOWN:
+                SDLJoystickButtonDown(event.jbutton.which, static_cast<int>(event.jbutton.button));
+                break;
+            case SDL_JOYHATMOTION:
+                SDLJoystickHat(event.jhat.which, static_cast<int>(event.jhat.value));
+                break;
+            case SDL_JOYBUTTONUP:
+                SDLJoystickButtonUp(event.jbutton.which, static_cast<int>(event.jbutton.button));
+                break;
             default:
                 break;
             }
         }
-        if (running == false)
-            break;
-
         m_device->ApplicationTurboTick();
         m_device->ApplicationUpdate();
         SDL_RenderClear(m_renderer);
         SDL_RenderCopy(m_renderer, m_texture, nullptr, nullptr);
         SDL_RenderPresent(m_renderer);
     }
+}
+
+void SDLApplication::Terminate()
+{
+    if (m_joysticks[0].joy != nullptr)
+        SDL_JoystickClose(m_joysticks[0].joy);
+    if (m_joysticks[1].joy != nullptr)
+        SDL_JoystickClose(m_joysticks[1].joy);
     SDL_CloseAudio();
     SDL_DestroyRenderer(m_renderer);
     SDL_DestroyTexture(m_texture);
     SDL_DestroyWindow(m_window);
+    SDL_Quit();
 }
 
 void SDLApplication::FillAudioBuffer(unsigned char* stream, int len)
@@ -263,3 +312,140 @@ void SDLApplication::FillAudioBuffer(unsigned char* stream, int len)
     m_device->FillAudioSamples(stream, len);
 }
 
+nes::Player SDLApplication::GetPlayerByJoyID(SDL_JoystickID id)
+{
+    if (m_joysticks[0].joy && id == m_joysticks[0].id)
+        return m_joysticks[0].player;
+    if (m_joysticks[1].joy && id == m_joysticks[1].id)
+        return m_joysticks[1].player;
+    return nes::Player::Player1;
+}
+
+void SDLApplication::SDLJoystickHat(SDL_JoystickID id, int hat_value)
+{
+    auto player = GetPlayerByJoyID(id);
+
+    if ((hat_value & SDL_HAT_LEFT) && !(m_last_hat_value & SDL_HAT_LEFT))
+        m_device->ApplicationKeyDown(player, nes::InputKey::Left);
+    else if (!(hat_value & SDL_HAT_LEFT) && (m_last_hat_value & SDL_HAT_LEFT))
+        m_device->ApplicationKeyUp(player, nes::InputKey::Left);
+
+    if ((hat_value & SDL_HAT_RIGHT) && !(m_last_hat_value & SDL_HAT_RIGHT))
+        m_device->ApplicationKeyDown(player, nes::InputKey::Right);
+    else if (!(hat_value & SDL_HAT_RIGHT) && (m_last_hat_value & SDL_HAT_RIGHT))
+        m_device->ApplicationKeyUp(player, nes::InputKey::Right);
+
+    if ((hat_value & SDL_HAT_UP) && !(m_last_hat_value & SDL_HAT_UP))
+        m_device->ApplicationKeyDown(player, nes::InputKey::Up);
+    else if (!(hat_value & SDL_HAT_UP) && (m_last_hat_value & SDL_HAT_UP))
+        m_device->ApplicationKeyUp(player, nes::InputKey::Up);
+
+    if ((hat_value & SDL_HAT_DOWN) && !(m_last_hat_value & SDL_HAT_DOWN))
+        m_device->ApplicationKeyDown(player, nes::InputKey::Down);
+    else if (!(hat_value & SDL_HAT_DOWN) && (m_last_hat_value & SDL_HAT_DOWN))
+        m_device->ApplicationKeyUp(player, nes::InputKey::Down);
+
+    m_last_hat_value = hat_value;
+}
+
+void SDLApplication::SDLJoystickButtonDown(SDL_JoystickID id, int button)
+{
+    auto player = GetPlayerByJoyID(id);
+    // 先这么写
+    nes::InputKey key;
+    switch (static_cast<JoystickXBoxButton>(button))
+    {
+    case JoystickXBoxButton::A:
+        key = nes::InputKey::B;
+        break;
+    case JoystickXBoxButton::B:
+        key = nes::InputKey::A;
+        break;
+    case JoystickXBoxButton::X:
+        key = nes::InputKey::TurboB;
+        break;
+    case JoystickXBoxButton::Y:
+        key = nes::InputKey::TurboA;
+        break;
+    case JoystickXBoxButton::LB:
+    case JoystickXBoxButton::RB:
+        return;
+    case JoystickXBoxButton::View:
+        key = nes::InputKey::Select;
+        break;
+    case JoystickXBoxButton::Menu:
+        key = nes::InputKey::Start;
+        break;
+    case JoystickXBoxButton::L:
+    case JoystickXBoxButton::R:
+        return;
+    }
+
+    m_device->ApplicationKeyDown(player, key);
+}
+
+void SDLApplication::SDLJoystickButtonUp(SDL_JoystickID id, int button)
+{
+    auto player = GetPlayerByJoyID(id);
+    // 先这么写
+    nes::InputKey key;
+    switch (static_cast<JoystickXBoxButton>(button))
+    {
+    case JoystickXBoxButton::A:
+        key = nes::InputKey::B;
+        break;
+    case JoystickXBoxButton::B:
+        key = nes::InputKey::A;
+        break;
+    case JoystickXBoxButton::X:
+        key = nes::InputKey::TurboB;
+        break;
+    case JoystickXBoxButton::Y:
+        key = nes::InputKey::TurboA;
+        break;
+    case JoystickXBoxButton::LB:
+    case JoystickXBoxButton::RB:
+        return;
+    case JoystickXBoxButton::View:
+        key = nes::InputKey::Select;
+        break;
+    case JoystickXBoxButton::Menu:
+        key = nes::InputKey::Start;
+        break;
+    case JoystickXBoxButton::L:
+    case JoystickXBoxButton::R:
+        return;
+    }
+
+    m_device->ApplicationKeyUp(player, key);
+}
+
+void SDLApplication::SDLJoystickAxis(SDL_JoystickID id, int axis, int value)
+{
+    auto player = GetPlayerByJoyID(id);
+
+    if (value < JOYSTICK_DEAD_ZONE && value > -JOYSTICK_DEAD_ZONE)
+    {
+        if (axis == 0)
+        {
+            m_device->ApplicationKeyUp(player, nes::InputKey::Left);
+            m_device->ApplicationKeyUp(player, nes::InputKey::Right);
+        }
+        else if (axis == 1)
+        {
+            m_device->ApplicationKeyUp(player, nes::InputKey::Up);
+            m_device->ApplicationKeyUp(player, nes::InputKey::Down);
+        }
+    }
+    else
+    {
+        if (axis == 0 && value > 0)
+            m_device->ApplicationKeyDown(player, nes::InputKey::Right);
+        else if (axis == 0 && value < 0)
+            m_device->ApplicationKeyDown(player, nes::InputKey::Left);
+        if (axis == 1 && value < 0)
+            m_device->ApplicationKeyDown(player, nes::InputKey::Up);
+        else if (axis == 1 && value > 0)
+            m_device->ApplicationKeyDown(player, nes::InputKey::Down);
+    }
+}

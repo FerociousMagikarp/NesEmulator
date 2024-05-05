@@ -75,6 +75,7 @@ int main(int argc, char *argv[])
 	});
 
     application.Run(running);
+    application.Terminate();
 
     return 0;
 }
