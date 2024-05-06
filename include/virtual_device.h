@@ -76,7 +76,7 @@ namespace nes
             std::array<std::array<bool, 10>, 2> m_keyboard{};
             bool m_is_turbo = false;
 
-            std::uint64_t m_turbo_time_interval_ms = 20;
+            std::int64_t m_turbo_time_interval_ms = 20;
             std::chrono::steady_clock::time_point m_turbo_time{};
 
             struct AudioSamples

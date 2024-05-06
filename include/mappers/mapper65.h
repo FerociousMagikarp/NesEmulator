@@ -2,6 +2,7 @@
 
 #include "mappers/mapper.h"
 #include <cstdint>
+#include <array>
 #include <memory>
 
 namespace nes

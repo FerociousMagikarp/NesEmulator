@@ -4,6 +4,7 @@
 #include <memory>
 #include <functional>
 #include <variant>
+#include <array>
 #include <unordered_map>
 #include "SDL_keycode.h"
 #include "SDL_joystick.h"

@@ -10,7 +10,7 @@ namespace nes
     Mapper1::Mapper1(Cartridge* cartridge) : Mapper(cartridge)
     {
         m_first_bank_PRG = 0x0000;
-        m_last_bank_PRG = cartridge->GetPRGRom().size() - 0x4000;
+        m_last_bank_PRG = static_cast<std::uint32_t>(cartridge->GetPRGRom().size()) - 0x4000;
         m_CHR_bank_low = 0x0000;
         m_CHR_bank_high = 0x1000;
         if (cartridge->GetCHRRom().empty())
@@ -109,7 +109,7 @@ namespace nes
                 break;
             case 3: // fix last bank at $C000 and switch 16 KB bank at $8000
                 m_first_bank_PRG = static_cast<std::uint32_t>(m_PRG_bank & 0x0f) << 14;
-                m_last_bank_PRG = m_cartridge->GetPRGRom().size() - 0x4000;
+                m_last_bank_PRG = static_cast<std::uint32_t>(m_cartridge->GetPRGRom().size()) - 0x4000;
                 break;
             default: // 没有这种情况
                 break;

@@ -238,6 +238,9 @@ void SDLApplication::Run(bool &running)
     while (running)
     {
         SDL_Event event;
+        // 这个SDL_PumpEvents虽然在下面的SDL_PollEvent中有调用，
+        // 但是在MSVC中测试的时候不加这一行就会出现按键抬起延迟的问题。
+        SDL_PumpEvents();
         while (SDL_PollEvent(&event))
         {
             switch (event.type)
