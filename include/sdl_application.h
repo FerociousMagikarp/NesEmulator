@@ -16,23 +16,25 @@ struct SDL_Texture;
 namespace nes
 {
     class VirtualDevice;
+    class NesEmulator;
 }
 
 class SDLApplication
 {
     public:
-        SDLApplication() = default;
+        SDLApplication(std::shared_ptr<nes::VirtualDevice> device, std::shared_ptr<nes::NesEmulator> emulator);
         ~SDLApplication();
 
         bool Init(int width, int height);
         void Run(bool& running);
         void Terminate();
 
-        void SetVirtualDevice(std::shared_ptr<nes::VirtualDevice> device);
         void FillAudioBuffer(unsigned char* stream, int len);
 
         void SetControl(nes::KeyCode key, nes::InputKey input, nes::Player player);
-        void SetControl(nes::KeyCode key, std::function<void()> func);
+        void SetEmulatorControl(nes::KeyCode key, nes::EmulatorOperation op);
+
+        inline void SetJoystickDeadZone(int val) noexcept { m_joystick_deadzone = val; }
 
     private:
         void SDLJoystickHat(SDL_JoystickID id, int hat_value);
@@ -53,13 +55,15 @@ class SDLApplication
         };
         std::array<Joystick, 2> m_joysticks{};
         int m_last_hat_value = 0;
+        int m_joystick_deadzone = 0;
 
         std::shared_ptr<nes::VirtualDevice> m_device;
+        std::shared_ptr<nes::NesEmulator> m_emulator;
 
         struct KeyInfo
         {
             nes::InputKey key;
             nes::Player player;
         };
-        std::unordered_map<SDL_Keycode, std::variant<KeyInfo, std::function<void()>>> m_keyboard_map;
+        std::unordered_map<SDL_Keycode, std::variant<KeyInfo, nes::EmulatorOperation>> m_keyboard_map;
 };

@@ -22,10 +22,10 @@ void SetInputControlConfig(SDLApplication& app, const nes::InputConfig config, n
     app.SetControl(config.TurboB, nes::InputKey::TurboB, player);
 }
 
-void SetFunctionControlConfig(SDLApplication& app, const nes::FuncConfig& config, std::shared_ptr<nes::NesEmulator> emulator)
+void SetEmulatorControlConfig(SDLApplication& app, const nes::FuncConfig& config)
 {
-    app.SetControl(config.Save, [emulator]()->void { emulator->SetOperation(nes::EmulatorOperation::Save); });
-    app.SetControl(config.Load, [emulator]()->void { emulator->SetOperation(nes::EmulatorOperation::Load); });
+    app.SetEmulatorControl(config.Save, nes::EmulatorOperation::Save);
+    app.SetEmulatorControl(config.Load, nes::EmulatorOperation::Load);
 }
 
 int main(int argc, char *argv[])
@@ -56,16 +56,16 @@ int main(int argc, char *argv[])
     // 卡带插入机器中
     nes_emulator->PutInCartridge(std::move(cartridge));
 
-    SDLApplication application;
+    SDLApplication application(device, nes_emulator);
     if (!application.Init(device->GetWidth(), device->GetHeight()))
     {
         std::cout << "Unable to load nes file : " << CommandLine::GetInstance().GetNesPath() << std::endl;
         return 0;
     }
-    application.SetVirtualDevice(device);
+    application.SetJoystickDeadZone(config.Base.JoystickDeadZone);
     SetInputControlConfig(application, config.Player1, nes::Player::Player1);
     SetInputControlConfig(application, config.Player2, nes::Player::Player2);
-    SetFunctionControlConfig(application, config.ShortcutKeys, nes_emulator);
+    SetEmulatorControlConfig(application, config.ShortcutKeys);
 
     bool running = true;
 

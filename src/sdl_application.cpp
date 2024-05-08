@@ -2,6 +2,7 @@
 #include "SDL.h"
 #include "def.h"
 #include "virtual_device.h"
+#include "emulator.h"
 #include <chrono>
 #include <iostream>
 
@@ -151,7 +152,14 @@ enum class JoystickXBoxButton
     R,
 };
 
-constexpr int JOYSTICK_DEAD_ZONE = 10;
+SDLApplication::SDLApplication(std::shared_ptr<nes::VirtualDevice> device, std::shared_ptr<nes::NesEmulator> emulator)
+    : m_device(std::move(device)), m_emulator(std::move(emulator))
+{
+    m_device->SetApplicationUpdateCallback([this]()->void
+    {
+        SDL_UpdateTexture(m_texture, nullptr, m_device->GetScreenPointer(), nes::NES_WIDTH * 4);
+    });
+}
 
 SDLApplication::~SDLApplication()
 {
@@ -206,15 +214,6 @@ bool SDLApplication::Init(int width, int height)
     return true;
 }
 
-void SDLApplication::SetVirtualDevice(std::shared_ptr<nes::VirtualDevice> device)
-{
-    device->SetApplicationUpdateCallback([this]()->void
-    {
-        SDL_UpdateTexture(m_texture, nullptr, m_device->GetScreenPointer(), nes::NES_WIDTH * 4);
-    });
-    m_device = std::move(device);
-}
-
 void SDLApplication::SetControl(nes::KeyCode key, nes::InputKey input, nes::Player player)
 {
     if (key == nes::KeyCode::Unknown)
@@ -224,13 +223,13 @@ void SDLApplication::SetControl(nes::KeyCode key, nes::InputKey input, nes::Play
     m_keyboard_map[sdl_key] = KeyInfo{input, player};
 }
 
-void SDLApplication::SetControl(nes::KeyCode key, std::function<void()> func)
+void SDLApplication::SetEmulatorControl(nes::KeyCode key, nes::EmulatorOperation op)
 {
     if (key == nes::KeyCode::Unknown)
         return;
     // 这里一定能找到
     auto sdl_key = KEY_CODE_MAP.find(key)->second;
-    m_keyboard_map[sdl_key] = std::move(func);
+    m_keyboard_map[sdl_key] = op;
 }
 
 void SDLApplication::Run(bool &running)
@@ -256,8 +255,8 @@ void SDLApplication::Run(bool &running)
                         using type = std::decay_t<decltype(val)>;
                         if constexpr (std::is_same_v<type, KeyInfo>)
                             m_device->ApplicationKeyDown(val.player, val.key);
-                        else
-                            val();
+                        else if constexpr (std::is_same_v<type, nes::EmulatorOperation>)
+                            m_emulator->SetOperation(val);
                     }, iter->second);
                 }
                 break;
@@ -427,7 +426,7 @@ void SDLApplication::SDLJoystickAxis(SDL_JoystickID id, int axis, int value)
 {
     auto player = GetPlayerByJoyID(id);
 
-    if (value < JOYSTICK_DEAD_ZONE && value > -JOYSTICK_DEAD_ZONE)
+    if (value < m_joystick_deadzone && value > -m_joystick_deadzone)
     {
         if (axis == 0)
         {

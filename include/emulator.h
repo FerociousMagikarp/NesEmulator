@@ -13,13 +13,6 @@ namespace nes
 {
     class Cartridge;
 
-    enum class EmulatorOperation
-    {
-        None,
-        Save,
-        Load,
-    };
-
     class NesEmulator
     {
     public:

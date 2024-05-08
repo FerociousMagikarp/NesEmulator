@@ -44,6 +44,13 @@ namespace nes
     constexpr int SAVE_MAGIC_NUMBER = 1098186332;
     constexpr int SAVE_VERSION = 0;
 
+    enum class EmulatorOperation
+    {
+        None,
+        Save,
+        Load,
+    };
+
     struct InputConfig
     {
         KeyCode A;
@@ -65,12 +72,19 @@ namespace nes
         KeyCode Load;
     };
 
+    struct BaseConfig
+    {
+        int Scale = 3;
+        int JoystickDeadZone = 8000;
+    };
+
     struct Config
     {
         using enum KeyCode;
         InputConfig Player1 = {K, J, Semicolon, Return, W, S, A, D, I, U};
         InputConfig Player2 = {KPPeriod, KP0, KPPlus, KPEnter, Up, Down, Left, Right, KP2, KP1};
         FuncConfig  ShortcutKeys = { Comma, Period };
+        BaseConfig  Base;
     };
 
     // 保存数据的时候用的，如果之后有大小端问题可以在这里处理
