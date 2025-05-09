@@ -3,8 +3,6 @@
 #include "def.h"
 #include "virtual_device.h"
 #include "emulator.h"
-#include <chrono>
-#include <iostream>
 
 const std::unordered_map<nes::KeyCode, SDL_KeyCode> KEY_CODE_MAP = 
 {

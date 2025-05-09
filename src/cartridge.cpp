@@ -1,5 +1,4 @@
 #include "cartridge.h"
-#include <array>
 #include <fstream>
 #include <iostream>
 #include <memory>

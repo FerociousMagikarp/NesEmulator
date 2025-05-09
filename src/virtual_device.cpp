@@ -1,7 +1,6 @@
 #include "virtual_device.h"
 #include "palette.h"
 #include <assert.h>
-#include <cstdint>
 
 namespace nes
 {

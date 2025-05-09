@@ -1,9 +1,8 @@
 #pragma once
 
-
 #include "def.h"
-#include <cstdint>
 #include <functional>
+
 namespace nes
 {
     class Cartridge;

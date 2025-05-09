@@ -2,7 +2,6 @@
 
 #include "def.h"
 #include <memory>
-#include <functional>
 #include <variant>
 #include <array>
 #include <unordered_map>

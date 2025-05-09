@@ -1,6 +1,5 @@
 #include "mappers/mapper4.h"
 #include "cartridge.h"
-#include <cstdint>
 
 namespace nes
 {

@@ -1,7 +1,6 @@
 #include "mappers/mapper1.h"
 #include "cartridge.h"
 #include "def.h"
-#include <memory>
 
 namespace nes
 {

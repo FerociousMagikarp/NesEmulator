@@ -1,7 +1,6 @@
 #include "cpu.h"
 #include "cpu_disassembly.h"
 #include "cpu_instructions.h"
-#include <iostream>
 #include <type_traits>
 #include "def.h"
 

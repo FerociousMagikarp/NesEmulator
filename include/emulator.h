@@ -4,7 +4,6 @@
 #include "ppu.h"
 #include "apu.h"
 #include <memory>
-#include <chrono>
 #include <atomic>
 #include "cartridge.h"
 #include "virtual_device.h"

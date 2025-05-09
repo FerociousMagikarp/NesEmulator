@@ -1,7 +1,6 @@
 #pragma once
 
 #include "apu.h"
-#include <cstdint>
 #include <functional>
 #include <memory>
 

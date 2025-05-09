@@ -1,7 +1,6 @@
 #pragma once
 
 #include "mappers/mapper.h"
-#include <cstdint>
 #include <memory>
 #include <array>
 

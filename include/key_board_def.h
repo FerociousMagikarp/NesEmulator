@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string_view>
-#include <string>
 #include <unordered_map>
 
 #define ALL_KEY_BOARDS \
@@ -162,7 +161,7 @@ namespace nes
 #define KEY_NAME(key) {#key, KeyCode::key},
 
     // 键盘字符串与枚举的映射
-    inline const std::unordered_map<std::string, KeyCode> KeyMap = 
+    inline const std::unordered_map<std::string_view, KeyCode> KeyMap = 
     {
         ALL_KEY_BOARDS
     };

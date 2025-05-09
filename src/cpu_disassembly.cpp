@@ -1,6 +1,5 @@
 #include "cpu_disassembly.h"
 #include <array>
-#include <cstdint>
 #include <stdio.h>
 #include "cpu.h"
 #include "cpu_instructions.h"
