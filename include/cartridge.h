@@ -3,7 +3,7 @@
 #include <string>
 #include <memory>
 #include <vector>
-
+#include <string_view>
 #include "mappers/mapper.h"
 
 namespace nes
@@ -14,7 +14,7 @@ namespace nes
         Cartridge() = default;
         ~Cartridge() = default;
 
-        bool LoadFromFile(const char *path);
+        bool LoadFromFile(const std::string_view path);
         
         inline const std::vector<std::uint8_t>& GetPRGRom() const { return m_PRG_Rom; }
         inline const std::vector<std::uint8_t>& GetCHRRom() const { return m_CHR_Rom; }

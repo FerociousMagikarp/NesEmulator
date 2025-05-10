@@ -212,6 +212,31 @@ bool SDLApplication::Init(int width, int height)
     return true;
 }
 
+void SDLApplication::SetConfig(const nes::Config& config)
+{
+    SetInputControlConfig(config.Player1, nes::Player::Player1);
+    SetInputControlConfig(config.Player2, nes::Player::Player2);
+
+    SetEmulatorControl(config.ShortcutKeys.Save, nes::EmulatorOperation::Save);
+    SetEmulatorControl(config.ShortcutKeys.Load, nes::EmulatorOperation::Load);
+
+    m_joystick_deadzone = config.Base.JoystickDeadZone;
+}
+
+void SDLApplication::SetInputControlConfig(const nes::InputConfig config, nes::Player player)
+{
+    SetControl(config.A, nes::InputKey::A, player);
+    SetControl(config.B, nes::InputKey::B, player);
+    SetControl(config.Select, nes::InputKey::Select, player);
+    SetControl(config.Start, nes::InputKey::Start, player);
+    SetControl(config.Up, nes::InputKey::Up, player);
+    SetControl(config.Down, nes::InputKey::Down, player);
+    SetControl(config.Left, nes::InputKey::Left, player);
+    SetControl(config.Right, nes::InputKey::Right, player);
+    SetControl(config.TurboA, nes::InputKey::TurboA, player);
+    SetControl(config.TurboB, nes::InputKey::TurboB, player);
+}
+
 void SDLApplication::SetControl(nes::KeyCode key, nes::InputKey input, nes::Player player)
 {
     if (key == nes::KeyCode::Unknown)

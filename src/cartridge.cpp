@@ -20,7 +20,7 @@ namespace nes
         std::uint8_t unused[5];
     };
 
-    bool Cartridge::LoadFromFile(const char* path)
+    bool Cartridge::LoadFromFile(const std::string_view path)
     {
         m_file_name = path;
 

@@ -29,11 +29,7 @@ class SDLApplication
         void Terminate();
 
         void FillAudioBuffer(unsigned char* stream, int len);
-
-        void SetControl(nes::KeyCode key, nes::InputKey input, nes::Player player);
-        void SetEmulatorControl(nes::KeyCode key, nes::EmulatorOperation op);
-
-        inline void SetJoystickDeadZone(int val) noexcept { m_joystick_deadzone = val; }
+        void SetConfig(const nes::Config& config);
 
     private:
         void SDLJoystickHat(SDL_JoystickID id, int hat_value);
@@ -41,6 +37,9 @@ class SDLApplication
         void SDLJoystickButtonUp(SDL_JoystickID id, int button);
         void SDLJoystickAxis(SDL_JoystickID id, int axis, int value);
         nes::Player GetPlayerByJoyID(SDL_JoystickID id);
+        void SetControl(nes::KeyCode key, nes::InputKey input, nes::Player player);
+        void SetEmulatorControl(nes::KeyCode key, nes::EmulatorOperation op);
+        void SetInputControlConfig(const nes::InputConfig config, nes::Player player);
 
         SDL_Window* m_window;
         SDL_Renderer* m_renderer;

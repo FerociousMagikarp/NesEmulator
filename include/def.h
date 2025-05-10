@@ -1,6 +1,7 @@
 #pragma once
 
 #include "key_board_def.h"
+#include <string>
 
 namespace nes
 {
@@ -85,6 +86,8 @@ namespace nes
         InputConfig Player2 = {KPPeriod, KP0, KPPlus, KPEnter, Up, Down, Left, Right, KP2, KP1};
         FuncConfig  ShortcutKeys = { Comma, Period };
         BaseConfig  Base;
+
+        std::string RomPath = "";
     };
 
     // 保存数据的时候用的，如果之后有大小端问题可以在这里处理
