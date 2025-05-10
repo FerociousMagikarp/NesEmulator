@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <vector>
 #include <assert.h>
+#include <algorithm>
 
 
 namespace nes_support
