@@ -1,10 +1,12 @@
 #include "cmd_parser.h"
-#include "extern/ct_cmd.hpp"
 #include "ini_parser.h"
 #include <filesystem>
 #include <iostream>
 #include <concepts>
 #include <charconv>
+#include <unordered_map>
+#include <vector>
+#include <assert.h>
 
 
 namespace nes_support
@@ -17,6 +19,141 @@ namespace nes_support
  |_| \_|  \___| |___/ |_____| |_| |_| |_|  \__,_| |_|  \__,_|  \__|  \___/  |_|   
  )";
 
+    struct CMDArg
+    {
+        std::string_view name = "";
+        std::string_view message = "";
+        std::string_view default_val = ""; // 这里用字符串存一下，真正用的时候再转出去
+        std::string_view val = "";
+        char short_name = '\0';
+        bool has_set_val = false;
+    };
+
+    class CMDParser
+    {
+        public:
+            std::unordered_map<std::string_view, CMDArg> m_args;
+            std::unordered_map<char, std::string_view> m_short_full_map;
+            std::vector<std::string_view> m_must_args;
+            std::string_view m_ignore_name = "";
+            std::string_view m_program_name = "";
+            std::string m_error = "";
+
+            void AddParam(std::string_view name, char short_name = '\0', std::string_view message = "", std::string_view default_val = "", bool must = false, bool ignore = false)
+            {
+                assert(!name.empty());
+                assert(!m_args.contains(name));
+                assert(!m_short_full_map.contains(short_name));
+                auto [iter, success] = m_args.insert(std::make_pair(name, CMDArg{}));
+                if (!success)
+                    return;
+                auto& arg = iter->second;
+                arg.name = name;
+                arg.short_name = short_name;
+                arg.message = message;
+                arg.default_val = default_val;
+                if (short_name != '\0')
+                    m_short_full_map[short_name] = name;
+                if (must)
+                    m_must_args.push_back(name);
+                if (ignore)
+                    m_ignore_name = name;
+            }
+
+            std::string_view Get(std::string_view name)
+            {
+                auto iter = m_args.find(name);
+                if (iter == m_args.end())
+                    return "";
+                if (!iter->second.has_set_val)
+                    return iter->second.default_val;
+                return iter->second.val;
+            }
+
+            bool Exist(std::string_view name)
+            {
+                auto iter = m_args.find(name);
+                if (iter == m_args.end())
+                    return false;
+                return iter->second.has_set_val;
+            }
+
+            bool Parse(int argc, char** argv)
+            {
+                if (argc == 0)
+                    return false;
+
+                m_program_name = argv[0];
+
+                std::string_view last_name = m_ignore_name;
+
+                for (int i = 1; i < argc; i++)
+                {
+                    std::string_view arg(argv[i]);
+                    if (arg.empty())
+                    {
+                        return false;
+                    }
+                    if (arg[0] != '-') // 参数
+                    {
+                        auto iter = m_args.find(last_name);
+                        if (iter != m_args.end())
+                        {
+                            iter->second.val = arg;
+                            iter->second.has_set_val = true;
+                        }
+                        last_name = m_ignore_name;
+                    }
+                    else if (arg.size() >= 2 && arg[1] == '-') // 长参数名
+                    {
+                        arg.remove_prefix(2);
+                        if (!m_args.contains(arg))
+                        {
+                            m_error = std::string{"Undefined option: --"} + arg.data() + "\n";
+                            return false;
+                        }
+                        last_name = arg;
+
+                        auto arg_iter = m_args.find(last_name);
+                        assert(arg_iter != m_args.end());
+                        arg_iter->second.has_set_val = true;
+                    }
+                    else // 短参数名
+                    {
+                        arg.remove_prefix(1);
+                        if (arg.size() != 1 || !m_short_full_map.contains(arg[0]))
+                        {
+                            m_error = std::string{"Undefined option short name: -"} + arg.data() + "\n";
+                            return false;
+                        }
+                        auto iter = m_short_full_map.find(arg[0]);
+                        last_name = iter->second;
+
+                        auto arg_iter = m_args.find(last_name);
+                        assert(arg_iter != m_args.end());
+                        arg_iter->second.has_set_val = true;
+                    }
+                }
+
+                // 检查一下must参数是不是都设置了
+                for (const auto name : m_must_args)
+                {
+                    assert(m_args.contains(name));
+                    auto iter = m_args.find(name);
+                    if (!iter->second.has_set_val && iter->second.default_val.empty())
+                    {
+                        m_error += "Must set argument --";
+                        m_error += name;
+                        m_error += '\n';
+                    }
+                }
+                if (!m_error.empty())
+                    return false;
+
+                return true;
+            }
+
+    };
 
     struct rom_file
     {
@@ -36,26 +173,30 @@ namespace nes_support
     };
 
     // 用一下我搞的这个奇怪的玩具
-    auto parser_ptr = ct_cmd::make_parser_ptr<rom_file, config_file>();
+    auto parser_ptr = std::make_unique<CMDParser>();
     auto ini_parser_ptr = std::make_unique<IniParser>();
 
     bool CMDParse(int argc, char** argv) noexcept
     {
-        bool parse_res = parser_ptr->parse(argc, argv);
-        if (!parse_res || parser_ptr->is_help())
+        parser_ptr->AddParam("help", '?', "show help");
+        parser_ptr->AddParam("rom_file", '\0', "the nes rom file path", "", true, true);
+        parser_ptr->AddParam("config_file", 'c', "the config file path", "./config.ini", true);
+
+        bool parse_res = parser_ptr->Parse(argc, argv);
+        if (!parse_res || parser_ptr->Exist("help"))
             return false;
         return true;
     }
 
     bool CheckCMDParam()
     {
-        if (const auto& rom_file_path = parser_ptr->get<rom_file>();!std::filesystem::exists(rom_file_path))
+        if (const auto& rom_file_path = parser_ptr->Get("rom_file");!std::filesystem::exists(rom_file_path))
         {
             std::cout << "Do not exist rom file" << rom_file_path << ", please check." << std::endl;
             return false;
         }
 
-        const auto& config_file_path = parser_ptr->get<config_file>();
+        const auto& config_file_path = parser_ptr->Get("config_file");
         if (!std::filesystem::exists(config_file_path))
         {
             std::cout << "Do not exist config file" << config_file_path << ", please check." << std::endl;
@@ -115,7 +256,7 @@ namespace nes_support
     {
         nes::Config config;
 
-        config.RomPath = parser_ptr->get<rom_file>();
+        config.RomPath = parser_ptr->Get("rom_file");
 
         // Player1
         if (ini_parser_ptr->ExistSection("controller1"))
@@ -178,16 +319,33 @@ namespace nes_support
 
     std::string GetCMDError() noexcept
     {
-        if (parser_ptr->is_help())
+        if (parser_ptr->Exist("help"))
         {
-            auto msg = parser_ptr->generate_help_message();
+            constexpr int help_space = 16;
             constexpr std::string_view COMPILE_YEAR = GetCompileYear();
-            std::string head = std::format("{}\nMIT License\nCopyright (c) 2023 - {} FerociousMagikarp\n\n", PROGRAM_NAME, COMPILE_YEAR);
+            std::string head = std::string{PROGRAM_NAME} + "\nMIT License\nCopyright (c) 2023 - " + COMPILE_YEAR.data() + " FerociousMagikarp\n\n";
+            std::string msg = "usage: NesEmulator <[--rom_file] rom_file> [options] ...\n\noptions:\n";
+            for (const auto& [name, arg] : parser_ptr->m_args)
+            {
+                msg += "  ";
+                std::string next = "    ";
+                if (arg.short_name != '\0')
+                {
+                    next[0] = '-';
+                    next[1] = arg.short_name;
+                    next[2] = ',';
+                }
+                msg += next;
+                msg += name;
+                msg.append(static_cast<std::size_t>(std::max(1, help_space - static_cast<int>(name.size()))), ' ');
+                msg += arg.message;
+                msg += "\n";
+            }
             return head + msg;
         }
         else
         {
-            return std::string{parser_ptr->get_error()};
+            return parser_ptr->m_error;
         }
     }
 
