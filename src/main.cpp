@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
     SDLApplication application(device, nes_emulator);
     if (!application.Init(device->GetWidth(), device->GetHeight()))
     {
-        std::cout << "Unable to load nes file : " << CommandLine::GetInstance().GetNesPath() << std::endl;
+        std::cout << "Application initialize failed!" << std::endl;
         return 0;
     }
     application.SetJoystickDeadZone(config.Base.JoystickDeadZone);
