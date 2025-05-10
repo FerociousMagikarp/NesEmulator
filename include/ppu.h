@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 #include <coroutine>
+#include <cstdint>
 #include "def.h"
 
 namespace nes

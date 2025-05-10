@@ -25,7 +25,7 @@ namespace nes
         m_file_name = path;
 
         std::ifstream ifstream;
-        ifstream.open(path, std::ios::in | std::ios::binary);
+        ifstream.open(path.data(), std::ios::in | std::ios::binary);
 
         if (!ifstream.is_open())
         {

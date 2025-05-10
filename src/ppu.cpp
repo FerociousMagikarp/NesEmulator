@@ -1,4 +1,5 @@
 #include "ppu.h"
+#include <cstring>
 #include "virtual_device.h"
 
 namespace nes
@@ -600,11 +601,11 @@ namespace nes
     {
         // 从OAMADDR为起始下标，拷贝256字节
         if (m_OAMADDR == 0)
-            memcpy(m_primary_OAM.data(), data, 256);
+            std::memcpy(m_primary_OAM.data(), data, 256);
         else
         {
-            memcpy(m_primary_OAM.data() + m_OAMADDR, data, 256 - m_OAMADDR);
-            memcpy(m_primary_OAM.data(), data + 256 - m_OAMADDR, m_OAMADDR);
+            std::memcpy(m_primary_OAM.data() + m_OAMADDR, data, 256 - m_OAMADDR);
+            std::memcpy(m_primary_OAM.data(), data + 256 - m_OAMADDR, m_OAMADDR);
         }
     }
 

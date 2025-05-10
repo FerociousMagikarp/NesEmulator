@@ -1,0 +1,27 @@
+name: macOS CI
+
+on: [push, pull_request]
+
+jobs:
+  macos-build:
+    runs-on: macos-13
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Dependencies
+        run: |
+          brew install sdl2
+
+      - name: Configure CMake
+        run: |
+          mkdir build
+          cd build
+          cmake .. \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++
+
+      - name: Build
+        run: |
+          cd build
+          cmake --build . --parallel $(sysctl -n hw.logicalcpu)

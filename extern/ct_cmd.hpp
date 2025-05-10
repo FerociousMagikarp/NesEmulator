@@ -37,6 +37,7 @@
 #include <optional>
 #include <charconv>
 #include <vector>
+#include <memory>
 
 namespace ct_cmd
 {

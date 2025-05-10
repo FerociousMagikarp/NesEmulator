@@ -1,6 +1,6 @@
 #include "cpu_disassembly.h"
 #include <array>
-#include <stdio.h>
+// #include <stdio.h>
 #include "cpu.h"
 #include "cpu_instructions.h"
 
@@ -81,25 +81,25 @@ namespace nes
 
     void CPU6502Disassembly::ShowCPUInfo(std::uint8_t op_code)
     {
-        int length = ALL_INSTRUCTION_LENGTH[op_code];
-        char data[10];
-        switch (length)
-        {
-            case 1:
-                sprintf_s(data, ALL_INSTRUCTION_DATA_FORMAT[op_code]);
-                break;
-            case 2:
-                sprintf_s(data, ALL_INSTRUCTION_DATA_FORMAT[op_code], m_CPU->m_main_bus_read(m_CPU->m_PC));
-                break;
-            case 3:
-                sprintf_s(data, ALL_INSTRUCTION_DATA_FORMAT[op_code],
-                    m_CPU->m_main_bus_read(m_CPU->m_PC) | (static_cast<std::uint16_t>(m_CPU->m_main_bus_read(m_CPU->m_PC + 1)) << 8));
-                break;
-            default:
-                break; // 没这种情况
-        }
+        // int length = ALL_INSTRUCTION_LENGTH[op_code];
+        // char data[10];
+        // switch (length)
+        // {
+        //     case 1:
+        //         sprintf_s(data, ALL_INSTRUCTION_DATA_FORMAT[op_code]);
+        //         break;
+        //     case 2:
+        //         sprintf_s(data, ALL_INSTRUCTION_DATA_FORMAT[op_code], m_CPU->m_main_bus_read(m_CPU->m_PC));
+        //         break;
+        //     case 3:
+        //         sprintf_s(data, ALL_INSTRUCTION_DATA_FORMAT[op_code],
+        //             m_CPU->m_main_bus_read(m_CPU->m_PC) | (static_cast<std::uint16_t>(m_CPU->m_main_bus_read(m_CPU->m_PC + 1)) << 8));
+        //         break;
+        //     default:
+        //         break; // 没这种情况
+        // }
 
-        printf("$%04X  %s %-10s A : %02X, X : %02X, Y : %02X, P : %02X SP : %02X\n", m_CPU->m_PC - 1, 
-            ALL_INSTRUCTION_NAMES[op_code], data, m_CPU->m_A, m_CPU->m_X, m_CPU->m_Y, m_CPU->m_P, m_CPU->m_SP);
+        // printf("$%04X  %s %-10s A : %02X, X : %02X, Y : %02X, P : %02X SP : %02X\n", m_CPU->m_PC - 1, 
+        //     ALL_INSTRUCTION_NAMES[op_code], data, m_CPU->m_A, m_CPU->m_X, m_CPU->m_Y, m_CPU->m_P, m_CPU->m_SP);
     }
 }

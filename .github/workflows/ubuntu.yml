@@ -1,0 +1,38 @@
+name: Linux CI (GCC13/clang17)
+
+on: [push, pull_request]
+
+jobs:
+  linux-build:
+    name: Linux (GCC/Clang)
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        compiler: [gcc-13, clang-17]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Dependencies
+        run: |
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo apt-get update -qq
+          if [[ "${{ matrix.compiler }}" == gcc-13 ]]; then
+            sudo apt-get install -y gcc-13 g++-13 libsdl2-dev
+          else
+            wget https://apt.llvm.org/llvm.sh
+            sudo bash llvm.sh 17
+            sudo apt-get install -y clang-17 libstdc++-13-dev libsdl2-dev
+          fi
+
+      - name: Configure CMake
+        run: |
+          mkdir build
+          cd build
+          cmake .. \
+            ${{ matrix.compiler == 'clang-17' && '-DCMAKE_C_COMPILER=clang-17 -DCMAKE_CXX_COMPILER=clang++-17' || '-DCMAKE_C_COMPILER=gcc-13 -DCMAKE_CXX_COMPILER=g++-13' }}
+
+      - name: Build
+        run: |
+          cd build
+          cmake --build . --parallel $(nproc)

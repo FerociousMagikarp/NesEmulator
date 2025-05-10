@@ -2,6 +2,7 @@
 
 #include "def.h"
 #include <functional>
+#include <cstdint>
 
 namespace nes
 {
