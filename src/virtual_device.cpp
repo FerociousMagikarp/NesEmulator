@@ -7,7 +7,7 @@ namespace nes
     void VirtualDevice::ApplicationUpdate()
     {
         m_write_screen_finish.wait(false);
-        m_app_update_callback();
+        m_app_update_callback(m_screen.data());
         m_write_screen_finish.store(false);
     }
 

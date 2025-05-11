@@ -50,6 +50,7 @@ namespace nes
         None,
         Save,
         Load,
+        Screenshot,
     };
 
     struct InputConfig
@@ -71,6 +72,7 @@ namespace nes
     {
         KeyCode Save;
         KeyCode Load;
+        KeyCode Screenshot;
     };
 
     struct BaseConfig
@@ -82,9 +84,9 @@ namespace nes
     struct Config
     {
         using enum KeyCode;
-        InputConfig Player1 = {K, J, Semicolon, Return, W, S, A, D, I, U};
-        InputConfig Player2 = {KPPeriod, KP0, KPPlus, KPEnter, Up, Down, Left, Right, KP2, KP1};
-        FuncConfig  ShortcutKeys = { Comma, Period };
+        InputConfig Player1;
+        InputConfig Player2;
+        FuncConfig  ShortcutKeys;
         BaseConfig  Base;
 
         std::string RomPath = "";

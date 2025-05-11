@@ -15,16 +15,16 @@ namespace nes
             VirtualDevice() = default;
             ~VirtualDevice() = default;
 
-            inline const int GetWidth() const noexcept { return NES_WIDTH * m_scale; }
-            inline const int GetHeight() const noexcept { return NES_HEIGHT * m_scale; }
+            const int GetWidth() const noexcept { return NES_WIDTH * m_scale; }
+            const int GetHeight() const noexcept { return NES_HEIGHT * m_scale; }
 
-            inline void SetScale(int scale) noexcept { m_scale = scale; }
-            inline const int GetScale() const noexcept { return m_scale; }
-            inline void SetTurboTimeIntervalMs(std::uint64_t val) noexcept { m_turbo_time_interval_ms = val; }
-            inline std::uint64_t GetTurboTimeIntervalMs() const noexcept { return m_turbo_time_interval_ms; }
+            void SetScale(int scale) noexcept { m_scale = scale; }
+            const int GetScale() const noexcept { return m_scale; }
+            void SetTurboTimeIntervalMs(std::uint64_t val) noexcept { m_turbo_time_interval_ms = val; }
+            std::uint64_t GetTurboTimeIntervalMs() const noexcept { return m_turbo_time_interval_ms; }
 
-            inline const std::uint8_t* GetScreenPointer() const noexcept { return m_screen.data(); }
-            inline void SetApplicationUpdateCallback(std::function<void(void)>&& callback) { m_app_update_callback = std::move(callback); }
+            std::uint8_t* GetScreenPtr() noexcept { return m_screen.data(); }
+            void SetApplicationUpdateCallback(std::function<void(const std::uint8_t*)>&& callback) { m_app_update_callback = std::move(callback); }
 
             void ApplicationUpdate();
             void ApplicationKeyDown(Player player, InputKey key);
@@ -67,7 +67,7 @@ namespace nes
             // 操作音频buffer的时候加的锁
             std::mutex m_audio_mutex;
 
-            std::function<void(void)> m_app_update_callback;
+            std::function<void(const std::uint8_t*)> m_app_update_callback;
 
             std::uint8_t m_strobe = 0;
 

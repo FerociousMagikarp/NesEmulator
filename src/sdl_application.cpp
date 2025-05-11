@@ -3,6 +3,9 @@
 #include "def.h"
 #include "virtual_device.h"
 #include "emulator.h"
+#include <iostream>
+#include <filesystem>
+
 
 const std::unordered_map<nes::KeyCode, SDL_KeyCode> KEY_CODE_MAP = 
 {
@@ -153,9 +156,14 @@ enum class JoystickXBoxButton
 SDLApplication::SDLApplication(std::shared_ptr<nes::VirtualDevice> device, std::shared_ptr<nes::NesEmulator> emulator)
     : m_device(std::move(device)), m_emulator(std::move(emulator))
 {
-    m_device->SetApplicationUpdateCallback([this]()->void
+    m_device->SetApplicationUpdateCallback([this](const std::uint8_t* screen_pointer)->void
     {
-        SDL_UpdateTexture(m_texture, nullptr, m_device->GetScreenPointer(), nes::NES_WIDTH * 4);
+        SDL_UpdateTexture(m_texture, nullptr, screen_pointer, nes::NES_WIDTH * 4);
+    });
+
+    m_emulator->SetScreenshotCallback([this]()->void
+    {
+        Screenshot();
     });
 }
 
@@ -219,6 +227,7 @@ void SDLApplication::SetConfig(const nes::Config& config)
 
     SetEmulatorControl(config.ShortcutKeys.Save, nes::EmulatorOperation::Save);
     SetEmulatorControl(config.ShortcutKeys.Load, nes::EmulatorOperation::Load);
+    SetEmulatorControl(config.ShortcutKeys.Screenshot, nes::EmulatorOperation::Screenshot);
 
     m_joystick_deadzone = config.Base.JoystickDeadZone;
 }
@@ -253,6 +262,54 @@ void SDLApplication::SetEmulatorControl(nes::KeyCode key, nes::EmulatorOperation
     // 这里一定能找到
     auto sdl_key = KEY_CODE_MAP.find(key)->second;
     m_keyboard_map[sdl_key] = op;
+}
+
+void SDLApplication::Screenshot()
+{
+    constexpr int MAX_SCREENSHOT_COUNT = 65536;
+
+    auto surface = SDL_CreateRGBSurfaceFrom(static_cast<void*>(m_device->GetScreenPtr()), nes::NES_WIDTH, nes::NES_HEIGHT, 32, nes::NES_WIDTH * 4, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000);
+
+    std::string file_name = "";
+    const auto rom_filename = m_emulator->GetCartridgeFilename();
+    // 查找一个合适的文件名
+    std::filesystem::path p(rom_filename);
+    auto rom_dir = p.parent_path();
+    auto rom_name_str = p.stem().string() + "_screenshot";
+    auto ext = std::filesystem::path{".bmp"};
+    if (auto total = (rom_dir / rom_name_str).replace_extension(ext); !std::filesystem::exists(total))
+    {
+        file_name = total.string();
+    }
+    else
+    {
+        int num = 1;
+        std::filesystem::path next_path;
+        do
+        {
+            next_path = (rom_dir / std::filesystem::path{rom_name_str + '(' + std::to_string(num) + ')'}).replace_extension(ext);
+        } while(std::filesystem::exists(next_path) && ++num <= MAX_SCREENSHOT_COUNT); // 限制一下数量
+
+        if (num > MAX_SCREENSHOT_COUNT) // 超过了
+        {
+            std::cout << "There are too many screenshots!\n";
+            return;
+        }
+
+        file_name = next_path.string();
+    }
+
+    auto res = SDL_SaveBMP(surface, file_name.c_str());
+    if (res != 0)
+    {
+        std::cout << "Screenshot Error : " << SDL_GetError() << "\n";
+    }
+    else
+    {
+        std::cout << "Save screenshot success in " << file_name << "\n";
+    }
+    SDL_FreeSurface(surface);
+
 }
 
 void SDLApplication::Run(bool &running)

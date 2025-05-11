@@ -78,6 +78,9 @@ namespace nes
                     Load();
                     m_frame = m_PPU.GetFrame();
                     break;
+                case EmulatorOperation::Screenshot:
+                    m_screenshot_callback();
+                    break;
                 }
             }
             else

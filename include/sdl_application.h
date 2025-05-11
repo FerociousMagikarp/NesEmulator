@@ -40,6 +40,7 @@ class SDLApplication
         void SetControl(nes::KeyCode key, nes::InputKey input, nes::Player player);
         void SetEmulatorControl(nes::KeyCode key, nes::EmulatorOperation op);
         void SetInputControlConfig(const nes::InputConfig config, nes::Player player);
+        void Screenshot();
 
         SDL_Window* m_window;
         SDL_Renderer* m_renderer;

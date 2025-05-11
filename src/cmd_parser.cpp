@@ -297,6 +297,7 @@ namespace nes_support
             const auto& section = ini_parser_ptr->GetSection("shortcut_key");
             SetValue(config.ShortcutKeys.Load, section, "load");
             SetValue(config.ShortcutKeys.Save, section, "save");
+            SetValue(config.ShortcutKeys.Screenshot, section, "screenshot");
         }
 
         // 基础设置
@@ -329,7 +330,7 @@ namespace nes_support
             for (const auto& [name, arg] : parser_ptr->m_args)
             {
                 msg += "  ";
-                std::string next = "    ";
+                std::string next = "    --";
                 if (arg.short_name != '\0')
                 {
                     next[0] = '-';

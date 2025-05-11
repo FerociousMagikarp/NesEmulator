@@ -5,6 +5,8 @@
 #include "apu.h"
 #include <memory>
 #include <atomic>
+#include <concepts>
+#include <functional>
 #include "cartridge.h"
 #include "virtual_device.h"
 
@@ -28,7 +30,12 @@ namespace nes
             m_APU.SetDevice(device);
         }
 
+        template <typename F>
+            requires requires(F f) { {f()} -> std::same_as<void>; }
+        void SetScreenshotCallback(F&& f) { m_screenshot_callback = std::forward<F>(f); }
+
         void SetOperation(EmulatorOperation operation);
+        const std::string& GetCartridgeFilename() const noexcept { return m_cartridge->GetFileName(); }
 
     private:
         std::uint8_t MainBusRead(std::uint16_t address);
@@ -46,11 +53,11 @@ namespace nes
         std::shared_ptr<VirtualDevice> m_device = nullptr;
 
         std::atomic<EmulatorOperation> m_operation = EmulatorOperation::None;
+        std::uint64_t m_frame = 0;
+        std::function<void(void)> m_screenshot_callback;
 
         CPU6502 m_CPU;
         PPU     m_PPU;
         APU     m_APU;
-
-        std::uint64_t m_frame = 0;
     };
 }
