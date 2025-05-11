@@ -9,7 +9,7 @@
 
 [![Linux Build](https://img.shields.io/github/actions/workflow/status/FerociousMagikarp/NesEmulator/ubuntu.yml?label=Linux&logo=linux)](https://github.com/FerociousMagikarp/NesEmulator/actions/workflows/ubuntu.yml)
 [![macOS Build](https://img.shields.io/github/actions/workflow/status/FerociousMagikarp/NesEmulator/macos.yml?label=macOS&logo=apple)](https://github.com/FerociousMagikarp/NesEmulator/actions/workflows/macos.yml)
-[![Windows Build](https://img.shields.io/github/actions/workflow/status/FerociousMagikarp/NesEmulator/windows.yml?label=Windows&logo=Windows")](https://github.com/FerociousMagikarp/NesEmulator/actions/workflows/windows.yml)
+[![Windows Build](https://img.shields.io/github/actions/workflow/status/FerociousMagikarp/NesEmulator/windows.yml?label=Windows&logo=windows")](https://github.com/FerociousMagikarp/NesEmulator/actions/workflows/windows.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue)](https://opensource.org/licenses/MIT)
 [![Dependency](https://img.shields.io/badge/dependency-SDL2-0175c2)](https://www.libsdl.org/)
 [![C++20](https://img.shields.io/badge/C++-20-blue?logo=c%2B%2B)](https://shields.io/)
@@ -32,10 +32,13 @@ Reference : [WIKI](https://www.nesdev.org/wiki/). Occasionally referenced existi
 
 ## Usage
 To run a .nes image,
+
 ```
 NesEmulator <rom_file>
 ```
+
 You could get a help information by using:
+
 ```
 NesEmulator -?
 ```

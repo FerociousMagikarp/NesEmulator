@@ -3,26 +3,46 @@ name: Windows CI (VS2022)
 on: [push, pull_request]
 
 jobs:
-  windows-build:
+  windows-msvc:
     name: Windows (MSVC)
     runs-on: windows-2022
+    env:
+      VCPKG_ROOT: '${{ github.workspace }}/vcpkg'
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup vcpkg
+      - name: Restore vcpkg Cache
+        uses: actions/cache@v3
+        id: cache-vcpkg
+        with:
+          path: |
+            ${{ env.VCPKG_ROOT }}
+            ${{ github.workspace }}/build/vcpkg_installed
+            !${{ env.VCPKG_ROOT }}/.git
+            !${{ env.VCPKG_ROOT }}/buildtrees
+            !${{ env.VCPKG_ROOT }}/packages
+            !${{ env.VCPKG_ROOT }}/downloads
+          key: |
+            ${{ hashFiles( 'vcpkg.json' ) }}-${{ runner.os }}-cache-key-v1
+
+
+      # 仅首次或依赖变更时克隆 vcpkg
+      - name: Clone vcpkg (if cache missed)
+        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
         run: |
           git clone https://github.com/microsoft/vcpkg
           cd vcpkg
           .\bootstrap-vcpkg.bat
-          .\vcpkg install sdl2
 
-      - name: Setup MSVC
-        uses: microsoft/setup-msbuild@v2
-        with:
-          msbuild-architecture: x64
-          vs-version: latest
+      # 并行安装依赖 + 二进制缓存
+      - name: Install Dependencies
+        run: |
+          .\vcpkg\vcpkg install sdl2:x64-windows --binarycaching --x-binarysource=files,${{ env.VCPKG_ROOT }}/archives,readwrite
+        env:
+          VCPKG_BINARY_SOURCES: "clear;files,${{ env.VCPKG_ROOT }}/archives,readwrite"
 
+      # CMake 工具链配置
       - name: Configure CMake
         run: |
           mkdir build
@@ -30,9 +50,10 @@ jobs:
           cmake .. `
             -G "Visual Studio 17 2022" `
             -A x64 `
-            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+            -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
 
       - name: Build
         run: |
           cd build
           cmake --build . --config Release --parallel 4
+
